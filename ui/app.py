@@ -264,14 +264,12 @@ runs:
   image: 'Dockerfile'
 """
 
-    # Workflow content that builds and uses local Docker container
+    # Workflow content that calls REST API endpoints
     workflow_content = """name: PR-Agent Automation
 
 on:
   pull_request:
     types: [opened, reopened, synchronize]
-  issue_comment:
-    types: [created]
 
 permissions:
   issues: write
@@ -281,24 +279,32 @@ permissions:
 jobs:
   pr_agent_job:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || (github.event_name == 'issue_comment' && github.event.issue.pull_request)
-    name: Run PR-Agent
+    name: Run PR-Agent via REST API
+    env:
+      PR_AGENT_API_URL: ${{ secrets.PR_AGENT_API_URL || 'https://625b5210691e.ngrok-free.app' }}
+      PR_URL: ${{ github.event.pull_request.html_url }}
+    
     steps:
-      - name: Checkout PR-Agent code
-        uses: actions/checkout@v4
-        with:
-          repository: Codium-ai/pr-agent
-          ref: main
-          path: pr-agent-src
+      - name: Generate PR Description
+        run: |
+          curl -X POST "$PR_AGENT_API_URL/api/v1/describe" \\
+            -H "Content-Type: application/json" \\
+            -d "{\"pr_url\": \"$PR_URL\", \"auto_approve\": true}" \\
+            --max-time 300 || echo "Description generation failed or timed out"
       
-      - name: Build and run PR-Agent
-        uses: ./pr-agent-src
-        env:
-          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_ACTION_CONFIG.AUTO_DESCRIBE: true
-          GITHUB_ACTION_CONFIG.AUTO_REVIEW: true
-          GITHUB_ACTION_CONFIG.AUTO_IMPROVE: true
+      - name: Review PR Code
+        run: |
+          curl -X POST "$PR_AGENT_API_URL/api/v1/review" \\
+            -H "Content-Type: application/json" \\
+            -d "{\"pr_url\": \"$PR_URL\", \"auto_approve\": true}" \\
+            --max-time 300 || echo "Review generation failed or timed out"
+      
+      - name: Suggest Improvements
+        run: |
+          curl -X POST "$PR_AGENT_API_URL/api/v1/improve" \\
+            -H "Content-Type: application/json" \\
+            -d "{\"pr_url\": \"$PR_URL\", \"auto_approve\": true}" \\
+            --max-time 300 || echo "Improvement suggestions failed or timed out"
 """
     
     try:
