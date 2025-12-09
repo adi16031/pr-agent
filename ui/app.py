@@ -218,7 +218,10 @@ def setup_repo_automation(owner, repo):
     
     token = _get_github_token()
     if not token:
-        return jsonify({'error': 'GitHub token not configured', 'success': False}), 200
+        return jsonify({
+            'error': 'GitHub token not configured. Please set GITHUB_TOKEN or GH_TOKEN environment variable, or add it to pr_agent/settings/.secrets.toml',
+            'success': False
+        }), 200
     
     headers = {
         'Accept': 'application/vnd.github+json',
@@ -284,9 +287,12 @@ jobs:
                     'action': 'updated'
                 }), 200
             else:
+                error_body = update_response.json() if update_response.text else {}
+                error_msg = error_body.get('message', update_response.text)
                 return jsonify({
-                    'error': f'Failed to update workflow: {update_response.text}',
-                    'success': False
+                    'error': f'Failed to update workflow: {error_msg}. Make sure your GitHub token has "workflow" and "repo" scopes.',
+                    'success': False,
+                    'status': update_response.status_code
                 }), 200
         
         elif check_response.status_code == 404:
@@ -305,15 +311,21 @@ jobs:
                     'action': 'created'
                 }), 200
             else:
+                error_body = create_response.json() if create_response.text else {}
+                error_msg = error_body.get('message', create_response.text)
                 return jsonify({
-                    'error': f'Failed to create workflow: {create_response.text}',
-                    'success': False
+                    'error': f'Failed to create workflow: {error_msg}. Make sure your GitHub token has "workflow" and "repo" scopes.',
+                    'success': False,
+                    'status': create_response.status_code
                 }), 200
         
         else:
+            error_body = check_response.json() if check_response.text else {}
+            error_msg = error_body.get('message', check_response.text)
             return jsonify({
-                'error': f'Failed to check workflow existence: {check_response.text}',
-                'success': False
+                'error': f'Failed to check workflow existence: {error_msg}',
+                'success': False,
+                'status': check_response.status_code
             }), 200
     
     except Exception as e:
