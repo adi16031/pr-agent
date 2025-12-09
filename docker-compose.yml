@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  pr-agent-api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: pr-agent-api
+    ports:
+      - "8000:8000"
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - OPENAI_KEY=${OPENAI_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PORT=8000
+      - HOST=0.0.0.0
+      # Optional: Other LLM providers
+      # - ANTHROPIC_KEY=${ANTHROPIC_KEY}
+      # - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+    volumes:
+      - ./pr_agent:/app/pr_agent:ro
+      - ./pr_agent.toml:/app/pr_agent.toml:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - pr-agent-network
+    labels:
+      - "com.pr-agent.description=PR Agent REST API Server"
+
+  # Optional: Add Redis for caching/sessions
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: pr-agent-redis
+  #   ports:
+  #     - "6379:6379"
+  #   networks:
+  #     - pr-agent-network
+  #   restart: unless-stopped
+
+  # Optional: Add PostgreSQL for storing results
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: pr-agent-db
+  #   environment:
+  #     POSTGRES_USER: pr_agent
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+  #     POSTGRES_DB: pr_agent_db
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   networks:
+  #     - pr-agent-network
+  #   restart: unless-stopped
+
+networks:
+  pr-agent-network:
+    driver: bridge
+
+# volumes:
+#   postgres_data:

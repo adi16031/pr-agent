@@ -1,0 +1,514 @@
+{
+  "info": {
+    "name": "PR Agent REST API",
+    "description": "Collection of API endpoints for PR Agent REST API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health & Info",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8000/health",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "Get Capabilities",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8000/api/v1/capabilities",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "capabilities"]
+            }
+          }
+        },
+        {
+          "name": "Get Configuration",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8000/api/v1/config",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "config"]
+            }
+          }
+        },
+        {
+          "name": "API Documentation (Swagger)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8000/docs",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["docs"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "PR Review",
+      "item": [
+        {
+          "name": "Review PR (Sync)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pr_url\": \"https://github.com/owner/repo/pull/123\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/review",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "review"]
+            }
+          }
+        },
+        {
+          "name": "Review PR (With Instructions)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pr_url\": \"https://github.com/owner/repo/pull/123\",\n  \"extra_instructions\": \"Focus on security and performance aspects. Check for SQL injection vulnerabilities.\",\n  \"ai_temperature\": 0.7\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/review",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "review"]
+            }
+          }
+        },
+        {
+          "name": "Review PR (Async)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pr_url\": \"https://github.com/owner/repo/pull/123\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/review/async",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "review", "async"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "PR Description",
+      "item": [
+        {
+          "name": "Generate Description (Sync)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pr_url\": \"https://github.com/owner/repo/pull/123\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/describe",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "describe"]
+            }
+          }
+        },
+        {
+          "name": "Generate Description (With Instructions)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pr_url\": \"https://github.com/owner/repo/pull/123\",\n  \"extra_instructions\": \"Include API changes, backward compatibility notes, and migration guide if applicable.\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/describe",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "describe"]
+            }
+          }
+        },
+        {
+          "name": "Generate Description (Async)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pr_url\": \"https://github.com/owner/repo/pull/123\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/describe/async",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "describe", "async"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Code Improvements",
+      "item": [
+        {
+          "name": "Get Improvements (Sync)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pr_url\": \"https://github.com/owner/repo/pull/123\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/improve",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "improve"]
+            }
+          }
+        },
+        {
+          "name": "Get Improvements (Focus Performance)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pr_url\": \"https://github.com/owner/repo/pull/123\",\n  \"extra_instructions\": \"Prioritize performance optimizations. Suggest algorithmic improvements, caching strategies, and resource management optimizations.\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/improve",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "improve"]
+            }
+          }
+        },
+        {
+          "name": "Get Improvements (Async)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pr_url\": \"https://github.com/owner/repo/pull/123\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/improve/async",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "improve", "async"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Issues Detection",
+      "item": [
+        {
+          "name": "Detect All Issues",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pr_url\": \"https://github.com/owner/repo/pull/123\",\n  \"severity\": \"all\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/issues",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "issues"]
+            }
+          }
+        },
+        {
+          "name": "Detect Critical Issues",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pr_url\": \"https://github.com/owner/repo/pull/123\",\n  \"severity\": \"critical\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/issues",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "issues"]
+            }
+          }
+        },
+        {
+          "name": "Detect Major Issues",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pr_url\": \"https://github.com/owner/repo/pull/123\",\n  \"severity\": \"major\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/issues",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "issues"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Questions",
+      "item": [
+        {
+          "name": "Ask - Backward Compatibility",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pr_url\": \"https://github.com/owner/repo/pull/123\",\n  \"question\": \"Is this change backward compatible? What would break for existing users?\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/ask",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "ask"]
+            }
+          }
+        },
+        {
+          "name": "Ask - Security Implications",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pr_url\": \"https://github.com/owner/repo/pull/123\",\n  \"question\": \"What are the security implications of these changes? Could this introduce any vulnerabilities?\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/ask",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "ask"]
+            }
+          }
+        },
+        {
+          "name": "Ask - Test Coverage",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pr_url\": \"https://github.com/owner/repo/pull/123\",\n  \"question\": \"What additional tests should be added to cover edge cases?\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/ask",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "ask"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Batch Processing",
+      "item": [
+        {
+          "name": "Batch Review - All PRs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"repo_url\": \"https://github.com/owner/repo\",\n  \"action\": \"review\",\n  \"max_prs\": 10\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/batch",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "batch"]
+            }
+          }
+        },
+        {
+          "name": "Batch Describe - Top 5 PRs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"repo_url\": \"https://github.com/owner/repo\",\n  \"action\": \"describe\",\n  \"max_prs\": 5\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/batch",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "batch"]
+            }
+          }
+        },
+        {
+          "name": "Batch Improve - With Instructions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"repo_url\": \"https://github.com/owner/repo\",\n  \"action\": \"improve\",\n  \"max_prs\": 5,\n  \"extra_instructions\": \"Focus on performance and code quality. Suggest refactoring opportunities.\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/batch",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "batch"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
