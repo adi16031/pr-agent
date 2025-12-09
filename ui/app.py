@@ -346,7 +346,7 @@ jobs:
                     error_body = update_response.json() if update_response.text else {}
                     error_msg = error_body.get('message', update_response.text)
                     return jsonify({
-                        'error': f'Failed to update {file_path}: {error_msg}. Make sure your GitHub token has "workflow" and "repo" scopes.',
+                        'error': f'Failed to update {file_path}: {error_msg}. Make sure your GitHub token has "workflow" & "repo" scopes.',
                         'success': False,
                         'status': update_response.status_code
                     }), 200
