@@ -102,7 +102,7 @@ def get_open_prs(path: Path):
     if not owner or not repo:
         return {'error': 'unable to parse remote url', 'prs': []}
 
-    # Get token via helper (env or pr_agent/settings/.secrets.toml in repo root)
+    # Get token via helper (env or pr_agent/settings/.secrets.toml in repo)
     gh_token = _get_github_token()
     headers = {'Accept': 'application/vnd.github+json'}
     if gh_token:
@@ -218,21 +218,58 @@ def setup_repo_automation(owner, repo):
     
     token = _get_github_token()
     if not token:
-        return jsonify({'error': 'GitHub token not configured', 'success': False}), 200
+        return jsonify({
+            'error': 'GitHub token not configured. Please set GITHUB_TOKEN or GH_TOKEN environment variable, or add it to pr_agent/settings/.secrets.toml',
+            'success': False
+        }), 200
     
     headers = {
         'Accept': 'application/vnd.github+json',
         'Authorization': f'token {token}'
     }
     
-    # Workflow content
+    # Read the pr_agent code and docker files from current repo
+    cwd = find_repo_root(Path.cwd())
+    
+    # Dockerfile content
+    dockerfile_content = """FROM python:3.12-slim
+
+RUN apt-get update && apt-get install --no-install-recommends -y git curl && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY pyproject.toml requirements.txt ./
+RUN pip install --no-cache-dir . && rm pyproject.toml requirements.txt
+
+ENV PYTHONPATH=/app
+COPY pr_agent pr_agent
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+"""
+
+    # Entrypoint script
+    entrypoint_content = """#!/bin/bash
+python /app/pr_agent/servers/github_action_runner.py
+"""
+
+    # Action.yml for composite action
+    action_yml_content = """name: 'PR-Agent'
+description: 'Automated PR review, description, and improvement suggestions'
+branding:
+  icon: 'award'
+  color: 'green'
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+"""
+
+    # Workflow content that calls REST API endpoints
     workflow_content = """name: PR-Agent Automation
 
 on:
   pull_request:
     types: [opened, reopened, synchronize]
-  issue_comment:
-    types: [created]
 
 permissions:
   issues: write
@@ -242,79 +279,116 @@ permissions:
 jobs:
   pr_agent_job:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || (github.event_name == 'issue_comment' && github.event.issue.pull_request)
-    name: Run PR-Agent
+    name: Run PR-Agent via REST API
+    env:
+      PR_AGENT_API_URL: ${{ secrets.PR_AGENT_API_URL || 'https://625b5210691e.ngrok-free.app' }}
+      PR_URL: ${{ github.event.pull_request.html_url }}
+    
     steps:
-      - name: PR Agent action step
-        id: pragent
-        uses: Codium-ai/pr-agent@main
-        env:
-          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_ACTION_CONFIG.AUTO_DESCRIBE: true
-          GITHUB_ACTION_CONFIG.AUTO_REVIEW: true
-          GITHUB_ACTION_CONFIG.AUTO_IMPROVE: true
+      - name: Generate PR Description
+        run: |
+          PAYLOAD=$(printf '{"pr_url":"%s"}' "$PR_URL")
+          curl -X POST "$PR_AGENT_API_URL/api/v1/describe" \\
+            -H "Content-Type: application/json" \\
+            -d "$PAYLOAD" \\
+            --max-time 300 || echo "Description generation failed or timed out"
+      
+      - name: Review PR Code
+        run: |
+          PAYLOAD=$(printf '{"pr_url":"%s"}' "$PR_URL")
+          curl -X POST "$PR_AGENT_API_URL/api/v1/review" \\
+            -H "Content-Type: application/json" \\
+            -d "$PAYLOAD" \\
+            --max-time 300 || echo "Review generation failed or timed out"
+      
+      - name: Suggest Improvements
+        run: |
+          PAYLOAD=$(printf '{"pr_url":"%s"}' "$PR_URL")
+          curl -X POST "$PR_AGENT_API_URL/api/v1/improve" \\
+            -H "Content-Type: application/json" \\
+            -d "$PAYLOAD" \\
+            --max-time 300 || echo "Improvement suggestions failed or timed out"
 """
     
     try:
-        # Check if workflow already exists
-        workflow_path = '.github/workflows/pr-agent-automation.yml'
-        check_url = f'https://api.github.com/repos/{owner}/{repo}/contents/{workflow_path}'
-        check_response = requests.get(check_url, headers=headers, timeout=10)
-        
-        encoded_content = base64.b64encode(workflow_content.encode()).decode()
-        
-        if check_response.status_code == 200:
-            # File exists, update it
-            existing_data = check_response.json()
-            sha = existing_data.get('sha')
-            
-            update_data = {
-                'message': 'Update PR-Agent automation workflow',
-                'content': encoded_content,
-                'sha': sha
+        files_to_create = [
+            {
+                'path': '.github/workflows/pr-agent-automation.yml',
+                'content': base64.b64encode(workflow_content.encode()).decode(),
+                'message': 'Add PR-Agent automation workflow'
             }
+        ]
+        
+        results = []
+        
+        # Create/update each file
+        for file_info in files_to_create:
+            file_path = file_info['path']
+            file_content = file_info['content']
+            commit_msg = file_info['message']
             
-            update_response = requests.put(check_url, headers=headers, json=update_data, timeout=10)
+            check_url = f'https://api.github.com/repos/{owner}/{repo}/contents/{file_path}'
+            check_response = requests.get(check_url, headers=headers, timeout=10)
             
-            if update_response.status_code in [200, 201]:
-                return jsonify({
-                    'success': True,
-                    'message': 'Workflow updated successfully',
-                    'action': 'updated'
-                }), 200
+            if check_response.status_code == 200:
+                # File exists, update it
+                existing_data = check_response.json()
+                sha = existing_data.get('sha')
+                
+                update_data = {
+                    'message': commit_msg,
+                    'content': file_content,
+                    'sha': sha
+                }
+                
+                update_response = requests.put(check_url, headers=headers, json=update_data, timeout=10)
+                
+                if update_response.status_code in [200, 201]:
+                    results.append(f'{file_path} updated')
+                else:
+                    error_body = update_response.json() if update_response.text else {}
+                    error_msg = error_body.get('message', update_response.text)
+                    return jsonify({
+                        'error': f'Failed to update {file_path}: {error_msg}. Make sure your GitHub token has "workflow" & "repo" scopes.',
+                        'success': False,
+                        'status': update_response.status_code
+                    }), 200
+            
+            elif check_response.status_code == 404:
+                # File doesn't exist, create it
+                create_data = {
+                    'message': commit_msg,
+                    'content': file_content
+                }
+                
+                create_response = requests.put(check_url, headers=headers, json=create_data, timeout=10)
+                
+                if create_response.status_code in [200, 201]:
+                    results.append(f'{file_path} created')
+                else:
+                    error_body = create_response.json() if create_response.text else {}
+                    error_msg = error_body.get('message', create_response.text)
+                    return jsonify({
+                        'error': f'Failed to create {file_path}: {error_msg}. Make sure your GitHub token has "workflow" and "repo" scopes.',
+                        'success': False,
+                        'status': create_response.status_code
+                    }), 200
+            
             else:
+                error_body = check_response.json() if check_response.text else {}
+                error_msg = error_body.get('message', check_response.text)
                 return jsonify({
-                    'error': f'Failed to update workflow: {update_response.text}',
-                    'success': False
+                    'error': f'Failed to check {file_path}: {error_msg}',
+                    'success': False,
+                    'status': check_response.status_code
                 }), 200
         
-        elif check_response.status_code == 404:
-            # File doesn't exist, create it
-            create_data = {
-                'message': 'Add PR-Agent automation workflow',
-                'content': encoded_content
-            }
-            
-            create_response = requests.put(check_url, headers=headers, json=create_data, timeout=10)
-            
-            if create_response.status_code in [200, 201]:
-                return jsonify({
-                    'success': True,
-                    'message': 'Workflow created successfully',
-                    'action': 'created'
-                }), 200
-            else:
-                return jsonify({
-                    'error': f'Failed to create workflow: {create_response.text}',
-                    'success': False
-                }), 200
-        
-        else:
-            return jsonify({
-                'error': f'Failed to check workflow existence: {check_response.text}',
-                'success': False
-            }), 200
+        return jsonify({
+            'success': True,
+            'message': '. '.join(results),
+            'action': 'created/updated',
+            'files_created': [f['path'] for f in files_to_create]
+        }), 200
     
     except Exception as e:
         return jsonify({'error': str(e), 'success': False}), 200

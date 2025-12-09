@@ -236,7 +236,8 @@
               fetchRepos() // Refresh to show badge
             } else {
               automationStatus.className = 'automation-status status-error'
-              automationStatus.textContent = `✗ Error: ${data.error}`
+              const errorMsg = data.error || 'Unknown error'
+              automationStatus.innerHTML = `<strong>✗ Error:</strong> ${errorMsg}<br><small>Make sure your GitHub token has "workflow" and "repo" scopes.</small>`
             }
             automationBtn.disabled = false
           } catch (e) {
