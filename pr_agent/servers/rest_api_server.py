@@ -15,6 +15,7 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
+import json
 
 from pr_agent.agent.pr_agent import PRAgent
 from pr_agent.config_loader import get_settings
@@ -39,6 +40,38 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add request logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger = get_logger()
+    
+    # Log incoming request
+    logger.info(f"Incoming request: {request.method} {request.url.path}")
+    logger.info(f"Headers: {dict(request.headers)}")
+    
+    # Try to read and log body for POST/PUT requests
+    if request.method in ["POST", "PUT", "PATCH"]:
+        body = await request.body()
+        if body:
+            try:
+                body_json = json.loads(body)
+                logger.info(f"Request body: {json.dumps(body_json, indent=2)}")
+            except:
+                logger.info(f"Request body (raw): {body.decode('utf-8', errors='ignore')}")
+        
+        # Re-create request with body for downstream handlers
+        async def receive():
+            return {"type": "http.request", "body": body}
+        request = Request(request.scope, receive)
+    
+    # Process request
+    response = await call_next(request)
+    
+    # Log response
+    logger.info(f"Response status: {response.status_code}")
+    
+    return response
 
 # Initialize PR Agent
 pr_agent = PRAgent()

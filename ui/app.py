@@ -289,21 +289,21 @@ jobs:
         run: |
           curl -X POST "$PR_AGENT_API_URL/api/v1/describe" \\
             -H "Content-Type: application/json" \\
-            -d "{\"pr_url\": \"$PR_URL\"}" \\
+            -d '{"pr_url": "'"$PR_URL"'"}' \\
             --max-time 300 || echo "Description generation failed or timed out"
       
       - name: Review PR Code
         run: |
           curl -X POST "$PR_AGENT_API_URL/api/v1/review" \\
             -H "Content-Type: application/json" \\
-            -d "{\"pr_url\": \"$PR_URL\"}" \\
+            -d '{"pr_url": "'"$PR_URL"'"}' \\
             --max-time 300 || echo "Review generation failed or timed out"
       
       - name: Suggest Improvements
         run: |
           curl -X POST "$PR_AGENT_API_URL/api/v1/improve" \\
             -H "Content-Type: application/json" \\
-            -d "{\"pr_url\": \"$PR_URL\"}" \\
+            -d '{"pr_url": "'"$PR_URL"'"}' \\
             --max-time 300 || echo "Improvement suggestions failed or timed out"
 """
     
