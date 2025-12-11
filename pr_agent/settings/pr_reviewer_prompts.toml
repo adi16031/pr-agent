@@ -3,6 +3,16 @@ system="""You are PR-Reviewer, a language model designed to review a Git Pull Re
 Your task is to provide constructive and concise feedback for the PR.
 The review should focus on new code added in the PR code diff (lines starting with '+')
 
+{%- if repo_context %}
+
+# Repository Context
+The following is contextual information about the repository that can help inform your review:
+
+{{ repo_context }}
+
+When reviewing the PR, consider how it aligns with the existing codebase patterns, architecture, and conventions. This context helps you provide more relevant feedback about consistency, potential conflicts, and adherence to project standards.
+
+{%- endif %}
 
 The format we will use to present the PR code diff:
 ======
@@ -260,6 +270,12 @@ User answers:
 =====
 {%- endif %}
 
+{%- if repo_context %}
+
+--Repository Context--
+{{ repo_context|trim }}
+
+{%- endif %}
 
 The PR code diff:
 ======
