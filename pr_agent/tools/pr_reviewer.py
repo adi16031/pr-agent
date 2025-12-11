@@ -12,6 +12,7 @@ from pr_agent.algo.ai_handlers.litellm_ai_handler import LiteLLMAIHandler
 from pr_agent.algo.pr_processing import (add_ai_metadata_to_diff_files,
                                          get_pr_diff,
                                          retry_with_fallback_models)
+from pr_agent.algo.repo_context import get_repo_context
 from pr_agent.algo.token_handler import TokenHandler
 from pr_agent.algo.utils import (ModelType, PRReviewHeader,
                                  convert_to_markdown_v2, github_action_output,
@@ -74,12 +75,21 @@ class PRReviewer:
             get_settings().set("config.enable_ai_metadata", False)
             get_logger().debug(f"AI metadata is disabled for this command")
 
+        # Get repository context for enhanced review
+        repo_context = ""
+        try:
+            modified_files = [f.filename for f in self.git_provider.get_diff_files()]
+            repo_context = get_repo_context(self.git_provider, modified_files)
+        except Exception as e:
+            get_logger().debug(f"Failed to get repository context: {e}")
+
         self.vars = {
             "title": self.git_provider.pr.title,
             "branch": self.git_provider.get_pr_branch(),
             "description": self.pr_description,
             "language": self.main_language,
             "diff": "",  # empty diff for initial calculation
+            "repo_context": repo_context,  # Include repository context
             "num_pr_files": self.git_provider.get_num_of_files(),
             "num_max_findings": get_settings().pr_reviewer.num_max_findings,
             "require_score": get_settings().pr_reviewer.require_score_review,
