@@ -58,6 +58,10 @@ add_repo_metadata_file_list =["AGENTS.MD", "CLAUDE.MD", "Blackbox.MD"]
 # repository context analysis 💎
 repo_context_enabled=true # if true, will analyze repository context (architecture, conventions, related files) for enhanced PR reviews
 repo_context_max_files=50 # maximum number of files to analyze for repository context extraction
+enable_repo_context_cache=true # if true, caches repository context per repo for reuse across PRs
+repo_context_cache_ttl_hours=24 # hours before cached context expires
+# repo_context_cache_dir can override default cache location ~/.pr_agent_cache
+# repo_context_cache_dir=""
 # ignore logic
 ignore_pr_title = ["^\\[Auto\\]", "^Auto"] # a list of regular expressions to match against the PR title to ignore the PR agent
 ignore_pr_target_branches = [] # a list of regular expressions of target branches to ignore from PR agent when an PR is created
