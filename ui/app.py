@@ -1,12 +1,19 @@
-from flask import Flask, jsonify, render_template, request, Response
+from flask import Flask, jsonify, render_template, request, Response, redirect, url_for, session
 from pathlib import Path
 import subprocess
 import json
+import os
+import secrets
 
 # GitPython
 from git import Repo, InvalidGitRepositoryError
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', secrets.token_hex(32))
+
+# GitHub OAuth configuration
+GITHUB_CLIENT_ID = os.environ.get('GITHUB_CLIENT_ID', '')
+GITHUB_CLIENT_SECRET = os.environ.get('GITHUB_CLIENT_SECRET', '')
 
 
 def find_repo_root(start: Path) -> Path:
@@ -151,6 +158,39 @@ def _get_github_token():
     return None
 
 
+def _update_github_token(token):
+    """Update the GitHub token in .secrets.toml file"""
+    import toml
+    import os
+    
+    repo_root = find_repo_root(Path.cwd())
+    sec_path = repo_root / 'pr_agent' / 'settings' / '.secrets.toml'
+    
+    # Ensure the directory exists
+    sec_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Load existing data or create new
+    data = {}
+    if sec_path.is_file():
+        try:
+            data = toml.load(sec_path)
+        except Exception:
+            data = {}
+    
+    # Update the github token
+    if 'github' not in data:
+        data['github'] = {}
+    data['github']['user_token'] = token
+    
+    # Write back to file
+    try:
+        with open(sec_path, 'w') as f:
+            toml.dump(data, f)
+        return True
+    except Exception as e:
+        raise Exception(f"Failed to write token: {str(e)}")
+
+
 @app.route('/api/github/repos')
 def github_repos():
     """List repositories accessible by the configured GitHub token.
@@ -281,7 +321,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Run PR-Agent via REST API
     env:
-      PR_AGENT_API_URL: ${{ secrets.PR_AGENT_API_URL || 'https://625b5210691e.ngrok-free.app' }}
+      PR_AGENT_API_URL: ${{ secrets.PR_AGENT_API_URL || 'https://66d789067540.ngrok-free.app' }}
       PR_URL: ${{ github.event.pull_request.html_url }}
     
     steps:
@@ -461,6 +501,135 @@ def run_action():
         cmd.append(f'--pr_url={pr_url}')
     cmd.append(action)
     return Response(stream_subprocess(cmd, cwd=str(cli_cwd)), mimetype='text/plain')
+
+
+@app.route('/api/settings/github-token', methods=['GET', 'POST'])
+def github_token_settings():
+    """Get or update GitHub token configuration"""
+    import os
+    if request.method == 'GET':
+        token = _get_github_token()
+        # Return masked token or status
+        if token:
+            masked = token[:4] + '*' * (len(token) - 8) + token[-4:] if len(token) > 8 else '***'
+            return jsonify({
+                'configured': True,
+                'token': masked,
+                'source': 'environment' if os.environ.get('GITHUB_TOKEN') or os.environ.get('GH_TOKEN') else 'file'
+            })
+        else:
+            return jsonify({
+                'configured': False,
+                'token': None,
+                'source': None
+            })
+    
+    elif request.method == 'POST':
+        data = request.get_json() or {}
+        token = data.get('token', '').strip()
+        
+        if not token:
+            return jsonify({'error': 'Token cannot be empty', 'success': False}), 400
+        
+        # Validate token format (GitHub tokens typically start with ghp_, github_pat_, etc.)
+        if len(token) < 20:
+            return jsonify({'error': 'Token appears to be invalid (too short)', 'success': False}), 400
+        
+        try:
+            _update_github_token(token)
+            return jsonify({
+                'success': True,
+                'message': 'GitHub token updated successfully',
+                'source': 'file'
+            })
+        except Exception as e:
+            return jsonify({
+                'error': str(e),
+                'success': False
+            }), 500
+
+
+@app.route('/api/settings/oauth-config', methods=['GET'])
+def oauth_config():
+    """Get OAuth configuration status"""
+    return jsonify({
+        'enabled': bool(GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET),
+        'client_id': GITHUB_CLIENT_ID if GITHUB_CLIENT_ID else None
+    })
+
+
+@app.route('/auth/github')
+def github_oauth_login():
+    """Initiate GitHub OAuth flow"""
+    if not GITHUB_CLIENT_ID:
+        return jsonify({'error': 'GitHub OAuth not configured. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET environment variables.'}), 400
+    
+    # Generate state token for CSRF protection
+    state = secrets.token_urlsafe(32)
+    session['oauth_state'] = state
+    
+    # GitHub OAuth authorization URL
+    redirect_uri = url_for('github_oauth_callback', _external=True)
+    scope = 'repo,workflow,user:email'
+    
+    github_auth_url = (
+        f'https://github.com/login/oauth/authorize'
+        f'?client_id={GITHUB_CLIENT_ID}'
+        f'&redirect_uri={redirect_uri}'
+        f'&scope={scope}'
+        f'&state={state}'
+    )
+    
+    return redirect(github_auth_url)
+
+
+@app.route('/auth/github/callback')
+def github_oauth_callback():
+    """Handle GitHub OAuth callback"""
+    import requests
+    
+    # Verify state to prevent CSRF
+    state = request.args.get('state')
+    if not state or state != session.get('oauth_state'):
+        return render_template('oauth_result.html', success=False, error='Invalid state parameter')
+    
+    code = request.args.get('code')
+    if not code:
+        error = request.args.get('error', 'Unknown error')
+        return render_template('oauth_result.html', success=False, error=f'OAuth failed: {error}')
+    
+    # Exchange code for access token
+    try:
+        token_url = 'https://github.com/login/oauth/access_token'
+        redirect_uri = url_for('github_oauth_callback', _external=True)
+        
+        response = requests.post(token_url, data={
+            'client_id': GITHUB_CLIENT_ID,
+            'client_secret': GITHUB_CLIENT_SECRET,
+            'code': code,
+            'redirect_uri': redirect_uri
+        }, headers={'Accept': 'application/json'}, timeout=10)
+        
+        if response.status_code != 200:
+            return render_template('oauth_result.html', success=False, error=f'Failed to exchange code: {response.text}')
+        
+        data = response.json()
+        access_token = data.get('access_token')
+        
+        if not access_token:
+            error_msg = data.get('error_description', 'No access token received')
+            return render_template('oauth_result.html', success=False, error=error_msg)
+        
+        # Save the token
+        _update_github_token(access_token)
+        
+        # Clean up session
+        session.pop('oauth_state', None)
+        
+        return render_template('oauth_result.html', success=True, token=access_token[:10] + '...')
+        
+    except Exception as e:
+        return render_template('oauth_result.html', success=False, error=str(e))
 
 
 if __name__ == '__main__':
