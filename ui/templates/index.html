@@ -576,6 +576,39 @@
       .loading {
         animation: pulse 1.5s ease-in-out infinite;
       }
+
+      /* Vulnerability Scan Overlay */
+      .scan-overlay {
+        position: fixed;
+        inset: 0;
+        background: var(--modal-overlay);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 12px;
+        z-index: 1100;
+        backdrop-filter: blur(3px);
+      }
+
+      .scan-spinner {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        border: 5px solid var(--border-color);
+        border-top-color: var(--accent-primary);
+        animation: spin 0.9s linear infinite;
+      }
+
+      .scan-text {
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
     </style>
   </head>
   <body>
@@ -659,6 +692,13 @@
             When enabled, all new PRs will automatically get review, description, and improvement suggestions.
           </p>
         </div>
+        <div id="vuln-section" style="display:none; margin-bottom:16px;">
+          <button id="btn_scan_vuln" class="automation-btn" style="background: linear-gradient(135deg, #f59f00, #f76707);">Scan Vulnerabilities & Raise PR</button>
+          <div id="vuln-status" class="automation-status" style="display:none;"></div>
+          <p style="font-size:13px; color:var(--text-muted); margin-top:8px;">
+            Triggers a GitHub Actions workflow on the repo to run pip-audit remotely and open a PR with the report.
+          </p>
+        </div>
         <div id="controls" style="margin-bottom:12px; display:none">
           <input id="pr_url" type="text" placeholder="https://github.com/org/repo/pull/123" style="width:70%" />
           <button id="btn_review">Review</button>
@@ -670,7 +710,15 @@
       </div>
     </div>
 
+    <div id="scan-overlay" class="scan-overlay">
+      <div class="scan-spinner"></div>
+      <div class="scan-text">Scanning repository for vulnerabilities...</div>
+    </div>
+
     <script>
+      let currentOwner = null
+      let currentName = null
+      let currentFullname = null
       // Theme Management
       function initTheme() {
         const savedTheme = localStorage.getItem('pr_agent_theme') || 'light';
@@ -748,6 +796,9 @@
 
       async function showGithubRepo(owner, name){
         const fullname = owner + '/' + name
+        currentOwner = owner
+        currentName = name
+        currentFullname = fullname
         // clear selected
         document.querySelectorAll('.repo-item').forEach(e=>e.classList.remove('selected'))
         document.querySelectorAll('.repo-item').forEach(e=>{ 
@@ -775,6 +826,16 @@
         automationBtn.textContent = isAutomated ? 'Disable Automated PR Review' : 'Enable Automated PR Review'
         automationBtn.disabled = false
         automationBtn.onclick = () => toggleAutomation(owner, name)
+
+        // vulnerability scan controls
+        const vulnSection = document.getElementById('vuln-section')
+        const vulnStatus = document.getElementById('vuln-status')
+        const scanBtn = document.getElementById('btn_scan_vuln')
+        vulnSection.style.display = 'block'
+        vulnStatus.style.display = 'none'
+        scanBtn.disabled = false
+        scanBtn.textContent = 'Scan Vulnerabilities & Raise PR'
+        scanBtn.onclick = () => scanVulnerabilities()
         
         // show controls
         document.getElementById('controls').style.display = 'block'
@@ -893,6 +954,48 @@
             automationStatus.textContent = `✗ Error: ${e.message}`
             automationBtn.disabled = false
           }
+        }
+      }
+
+      function toggleScanOverlay(show, message = 'Scanning repository for vulnerabilities...') {
+        const overlay = document.getElementById('scan-overlay')
+        const text = overlay.querySelector('.scan-text')
+        text.textContent = message
+        overlay.style.display = show ? 'flex' : 'none'
+      }
+
+      async function scanVulnerabilities() {
+        if (!currentOwner || !currentName) {
+          alert('Select a repository first')
+          return
+        }
+
+        const vulnStatus = document.getElementById('vuln-status')
+        const scanBtn = document.getElementById('btn_scan_vuln')
+        vulnStatus.style.display = 'block'
+        vulnStatus.className = 'automation-status'
+        vulnStatus.textContent = 'Dispatching GitHub Actions workflow...'
+        scanBtn.disabled = true
+        toggleScanOverlay(true)
+
+        try {
+          const res = await fetch(`/api/github/repos/${currentOwner}/${currentName}/vulnerability-scan`, { method: 'POST' })
+          const data = await res.json()
+          if (res.ok && data.success) {
+            vulnStatus.className = 'automation-status status-success'
+            const wfLink = data.workflow_url ? `<a href="${data.workflow_url}" target="_blank" rel="noopener">View workflow</a>` : 'Workflow'
+            vulnStatus.innerHTML = `✓ Workflow dispatched on ${data.ref || 'default branch'}. ${wfLink}. A PR will be opened by the action when the scan completes.`
+          } else {
+            vulnStatus.className = 'automation-status status-error'
+            const err = data.error || 'Scan dispatch failed'
+            vulnStatus.textContent = `✗ ${err}`
+          }
+        } catch (e) {
+          vulnStatus.className = 'automation-status status-error'
+          vulnStatus.textContent = `✗ ${e.message}`
+        } finally {
+          scanBtn.disabled = false
+          toggleScanOverlay(false)
         }
       }
 
