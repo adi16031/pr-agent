@@ -24,6 +24,7 @@ from pr_agent.identity_providers import get_identity_provider
 from pr_agent.identity_providers.identity_provider import Eligibility
 from pr_agent.log import LoggingFormat, get_logger, setup_logger
 from pr_agent.secret_providers import get_secret_provider
+from pr_agent.servers.mention_handler import is_mention_present, parse_mention, log_mention_parsed
 
 setup_logger(fmt=LoggingFormat.JSON, level=get_settings().get("CONFIG.LOG_LEVEL", "DEBUG"))
 router = APIRouter()
@@ -298,6 +299,20 @@ async def handle_github_webhooks(background_tasks: BackgroundTasks, request: Req
                 log_context["api_url"] = pr_url
                 log_context["event"] = "comment"
                 comment_body = data["data"]["comment"]["content"]["raw"]
+                comment_id = data["data"]["comment"]["id"]
+                
+                # Check for @blackbox mentions
+                if comment_body and is_mention_present(comment_body):
+                    mention_result = parse_mention(comment_body)
+                    if mention_result:
+                        command, rest_of_comment = mention_result
+                        log_mention_parsed(comment_id, command, rest_of_comment)
+                        # Convert @blackbox mention to CLI format
+                        comment_body = f"/{command}"
+                        if rest_of_comment:
+                            comment_body += f" {rest_of_comment}"
+                        get_logger().info(f"Converted @blackbox mention to command: {comment_body}")
+                
                 with get_logger().contextualize(**log_context):
                     if get_identity_provider().verify_eligibility("bitbucket",
                                                                      sender_id, pr_url) is not Eligibility.NOT_ELIGIBLE:

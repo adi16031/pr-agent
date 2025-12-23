@@ -19,6 +19,7 @@ from pr_agent.git_providers.utils import apply_repo_settings
 from pr_agent.log import LoggingFormat, get_logger, setup_logger
 from pr_agent.secret_providers import get_secret_provider
 from pr_agent.git_providers import get_git_provider_with_context
+from pr_agent.servers.mention_handler import is_mention_present, parse_mention, log_mention_parsed
 
 setup_logger(fmt=LoggingFormat.JSON, level=get_settings().get("CONFIG.LOG_LEVEL", "DEBUG"))
 router = APIRouter()
@@ -264,6 +265,19 @@ async def gitlab_webhook(background_tasks: BackgroundTasks, request: Request):
 
                 get_logger().info(f"A comment has been added to a merge request: {url}")
                 body = data.get('object_attributes', {}).get('note')
+                
+                # Check for @blackbox mentions
+                if body and is_mention_present(body):
+                    mention_result = parse_mention(body)
+                    if mention_result:
+                        command, rest_of_comment = mention_result
+                        log_mention_parsed(comment_id, command, rest_of_comment)
+                        # Convert @blackbox mention to CLI format
+                        body = f"/{command}"
+                        if rest_of_comment:
+                            body += f" {rest_of_comment}"
+                        get_logger().info(f"Converted @blackbox mention to command: {body}")
+                
                 if data.get('object_attributes', {}).get('type') == 'DiffNote' and '/ask' in body: # /ask_line
                     body = handle_ask_line(body, data)
 

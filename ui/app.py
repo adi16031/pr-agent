@@ -339,6 +339,180 @@ jobs:
             return {'success': False, 'error': f'Failed to create workflow: {str(e)}'}
 
 
+def _ensure_blackbox_commands_workflow(owner: str, repo: str, token: str):
+        """Create or update a workflow that reacts to @blackbox commands in PR comments."""
+        workflow_filename = 'blackbox-commands.yml'
+        workflow_path = f'.github/workflows/{workflow_filename}'
+
+        workflow_content = textwrap.dedent("""
+        name: PR-Agent Commands (@blackbox)
+
+        on:
+            issue_comment:
+                types: [created]
+
+        permissions:
+            contents: read
+            pull-requests: write
+            issues: read
+
+        jobs:
+            run-commands:
+                # Only run for PR comments that mention @blackbox
+                if: github.event.issue.pull_request != null && contains(github.event.comment.body, '@blackbox')
+                runs-on: ubuntu-latest
+                steps:
+                    - name: Checkout
+                        uses: actions/checkout@v4
+
+                    - name: Set up Python
+                        uses: actions/setup-python@v5
+                        with:
+                            python-version: '3.11'
+
+                    - name: Install PR-Agent from repo
+                        run: |
+                            python -m pip install --upgrade pip
+                            pip install "git+https://github.com/{owner}/{repo}@{branch_placeholder}#subdirectory=pr_agent" || true
+                            # Fallback: install whole repo as a package if subdirectory install fails
+                            if ! python -c "import pr_agent" 2>/dev/null; then
+                                pip install "git+https://github.com/{owner}/{repo}@{branch_placeholder}"
+                            fi
+
+                    - name: Parse @blackbox command
+                        id: parse
+                        run: |
+                            body="${{ github.event.comment.body }}"
+                            lower=$(echo "$body" | tr '[:upper:]' '[:lower:]')
+                            # Extract the token following @blackbox and everything after it
+                            cmd=$(echo "$lower" | sed -nE "s/.*@blackbox[[:space:]]+([a-z_\-]+).*/\1/p" | head -n1)
+                            # Extract the full command with args after @blackbox
+                            rest=$(echo "$lower" | sed -nE "s/.*@blackbox[[:space:]]+(.*)/\1/p")
+                            echo "command=$cmd" >> "$GITHUB_OUTPUT"
+                            echo "rest=$rest" >> "$GITHUB_OUTPUT"
+                            echo "Detected command: $cmd"
+                            echo "Rest of comment: $rest"
+
+                    - name: Normalize command aliases
+                        id: normalize
+                        run: |
+                            CMD="${{ steps.parse.outputs.command }}"
+                            # Normalize synonyms to primary commands
+                            case "$CMD" in
+                                review_pr) CMD=review ;;
+                                describe_pr) CMD=describe ;;
+                                improve_code) CMD=improve ;;
+                                suggest*) CMD=improve ;;
+                                vuln|vulnerability|security) CMD=scan ;;
+                                ask_question|question) CMD=ask ;;
+                                update_changelog|changelog) CMD=update_changelog ;;
+                                generate_labels|label|labels) CMD=generate_labels ;;
+                                add_docs|documentation|docs) CMD=add_docs ;;
+                                search_docs|help) CMD=help_docs ;;
+                            esac
+                            echo "normalized=$CMD" >> "$GITHUB_OUTPUT"
+                            echo "Normalized command: $CMD"
+
+                    - name: Run PR-Agent command
+                        if: |
+                            steps.normalize.outputs.normalized == 'review' ||
+                            steps.normalize.outputs.normalized == 'describe' ||
+                            steps.normalize.outputs.normalized == 'improve' ||
+                            steps.normalize.outputs.normalized == 'scan' ||
+                            steps.normalize.outputs.normalized == 'ask' ||
+                            steps.normalize.outputs.normalized == 'update_changelog' ||
+                            steps.normalize.outputs.normalized == 'generate_labels' ||
+                            steps.normalize.outputs.normalized == 'add_docs' ||
+                            steps.normalize.outputs.normalized == 'reflect' ||
+                            steps.normalize.outputs.normalized == 'help_docs'
+                        env:
+                            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                            OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+                            ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+                            AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+                            AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+                        run: |
+                            PR_URL="https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}"
+                            CMD="${{ steps.normalize.outputs.normalized }}"
+                            REST="${{ steps.parse.outputs.rest }}"
+                            
+                            echo "Running PR-Agent: $CMD on $PR_URL"
+                            if [ -n "$REST" ] && [ "$CMD" != "$REST" ]; then
+                                # If there's remaining text after the command, pass it along
+                                python -m pr_agent.cli --pr_url="$PR_URL" "$CMD" "$REST"
+                            else
+                                python -m pr_agent.cli --pr_url="$PR_URL" "$CMD"
+                            fi
+
+                    - name: Provide feedback for unsupported commands
+                        if: |
+                            steps.normalize.outputs.normalized == '' ||
+                            (steps.normalize.outputs.normalized != 'review' &&
+                            steps.normalize.outputs.normalized != 'describe' &&
+                            steps.normalize.outputs.normalized != 'improve' &&
+                            steps.normalize.outputs.normalized != 'scan' &&
+                            steps.normalize.outputs.normalized != 'ask' &&
+                            steps.normalize.outputs.normalized != 'update_changelog' &&
+                            steps.normalize.outputs.normalized != 'generate_labels' &&
+                            steps.normalize.outputs.normalized != 'add_docs' &&
+                            steps.normalize.outputs.normalized != 'reflect' &&
+                            steps.normalize.outputs.normalized != 'help_docs')
+                        run: |
+                            echo "❌ @blackbox command '${{ steps.parse.outputs.command }}' not recognized or unsupported."
+                            echo "Supported commands: review, describe, improve, scan, ask, update_changelog, generate_labels, add_docs, reflect, help_docs"
+        """)
+
+        # Commit via git so the workflow is recognized immediately
+        import tempfile
+        try:
+                with tempfile.TemporaryDirectory() as tmpdir:
+                        clone_url = f'https://x-access-token:{token}@github.com/{owner}/{repo}.git'
+                        subprocess.run(['git', 'clone', clone_url, tmpdir], capture_output=True, text=True, timeout=60, check=True)
+
+                        # Determine the default branch so we can point pip install to a valid ref
+                        # Fallback to "main" if not resolvable
+                        branch = 'main'
+                        try:
+                                out = subprocess.run(['git', 'symbolic-ref', 'refs/remotes/origin/HEAD'], cwd=tmpdir, capture_output=True, text=True, check=True)
+                                # output like: refs/remotes/origin/main
+                                branch = out.stdout.rsplit('/', 1)[-1].strip() or 'main'
+                        except Exception:
+                                pass
+
+                        wf_dir = Path(tmpdir) / '.github' / 'workflows'
+                        wf_dir.mkdir(parents=True, exist_ok=True)
+                        wf_file = wf_dir / workflow_filename
+
+                        # Inject branch placeholder
+                        final_content = workflow_content.replace('{branch_placeholder}', branch)
+                        wf_file.write_text(final_content, encoding='utf-8')
+
+                        subprocess.run(['git', 'config', 'user.email', 'pr-agent@example.com'], cwd=tmpdir, capture_output=True, check=True)
+                        subprocess.run(['git', 'config', 'user.name', 'PR-Agent UI'], cwd=tmpdir, capture_output=True, check=True)
+                        subprocess.run(['git', 'add', str(wf_file)], cwd=tmpdir, capture_output=True, check=True)
+                        status = subprocess.run(['git', 'status', '--porcelain'], cwd=tmpdir, capture_output=True, text=True, check=True)
+                        if status.stdout.strip():
+                                subprocess.run(['git', 'commit', '-m', 'Add PR-Agent @blackbox commands workflow'], cwd=tmpdir, capture_output=True, check=True)
+                                subprocess.run(['git', 'push'], cwd=tmpdir, capture_output=True, check=True, timeout=60)
+                                print(f'[DEBUG] Commands workflow committed and pushed: {workflow_filename}')
+                        else:
+                                print(f'[DEBUG] Commands workflow already up to date: {workflow_filename}')
+                return {'success': True, 'workflow_filename': workflow_filename}
+        except subprocess.CalledProcessError as e:
+                return {'success': False, 'error': f'Git error: {e.stderr or e.stdout or str(e)}'}
+        except Exception as e:
+                return {'success': False, 'error': f'Failed to create commands workflow: {str(e)}'}
+
+
+@app.route('/api/github/repos/<owner>/<repo>/setup-blackbox-commands', methods=['POST'])
+def setup_blackbox_commands(owner, repo):
+        token = _get_github_token()
+        if not token:
+                return jsonify({'success': False, 'error': 'GitHub token not configured. Set GITHUB_TOKEN or GH_TOKEN, or save it in settings.'}), 400
+        resp = _ensure_blackbox_commands_workflow(owner, repo, token)
+        return jsonify(resp), 200
+
+
 def _dispatch_vuln_workflow(owner: str, repo: str, token: str, workflow_filename: str = 'pr-agent-vuln-scan.yml'):
         """Trigger the vulnerability scan workflow via workflow_dispatch."""
         import requests

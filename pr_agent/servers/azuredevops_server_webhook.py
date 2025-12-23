@@ -26,6 +26,7 @@ from pr_agent.git_providers import get_git_provider_with_context
 from pr_agent.git_providers.azuredevops_provider import AzureDevopsProvider
 from pr_agent.git_providers.utils import apply_repo_settings
 from pr_agent.log import LoggingFormat, get_logger, setup_logger
+from pr_agent.servers.mention_handler import is_mention_present, parse_mention, log_mention_parsed
 
 setup_logger(fmt=LoggingFormat.JSON, level=get_settings().get("CONFIG.LOG_LEVEL", "DEBUG"))
 security = HTTPBasic(auto_error=False)
@@ -128,14 +129,28 @@ async def handle_request_azure(data, log_context):
         )
     elif data["eventType"] == "ms.vss-code.git-pullrequest-comment-event" and "content" in data["resource"]["comment"]:
         comment = data["resource"]["comment"]
-        if available_commands_rgx.match(comment["content"]):
+        comment_content = comment["content"]
+        comment_id = int(comment["id"])
+        
+        # Check for @blackbox mentions
+        if is_mention_present(comment_content):
+            mention_result = parse_mention(comment_content)
+            if mention_result:
+                command, rest_of_comment = mention_result
+                log_mention_parsed(comment_id, command, rest_of_comment)
+                # Convert @blackbox mention to CLI format
+                comment_content = f"/{command}"
+                if rest_of_comment:
+                    comment_content += f" {rest_of_comment}"
+                get_logger().info(f"Converted @blackbox mention to command: {comment_content}")
+        
+        if available_commands_rgx.match(comment_content):
             if(data["resourceVersion"] == "2.0"):
                 repo = data["resource"]["pullRequest"]["repository"]["webUrl"]
                 pr_url = unquote(f'{repo}/pullrequest/{data["resource"]["pullRequest"]["pullRequestId"]}')
-                action = comment["content"]
+                action = comment_content
                 thread_url = comment["_links"]["threads"]["href"]
                 thread_id = int(thread_url.split("/")[-1])
-                comment_id = int(comment["id"])
                 pass
             else:
                 # API V1 not supported as it does not contain the PR URL

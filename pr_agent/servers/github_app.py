@@ -22,6 +22,7 @@ from pr_agent.git_providers.utils import apply_repo_settings
 from pr_agent.identity_providers import get_identity_provider
 from pr_agent.identity_providers.identity_provider import Eligibility
 from pr_agent.log import LoggingFormat, get_logger, setup_logger
+from pr_agent.servers.mention_handler import is_mention_present, parse_mention, log_mention_parsed
 from pr_agent.servers.utils import DefaultDictWithTimeout, verify_signature
 
 setup_logger(fmt=LoggingFormat.JSON, level=get_settings().get("CONFIG.LOG_LEVEL", "DEBUG"))
@@ -87,13 +88,27 @@ async def handle_comments_on_pr(body: Dict[str, Any],
     if "comment" not in body:
         return {}
     comment_body = body.get("comment", {}).get("body")
+    comment_id = body.get("comment", {}).get("id")
+    
+    # Check for @blackbox mentions first
+    if comment_body and isinstance(comment_body, str) and is_mention_present(comment_body):
+        mention_result = parse_mention(comment_body)
+        if mention_result:
+            command, rest_of_comment = mention_result
+            log_mention_parsed(comment_id, command, rest_of_comment)
+            # Convert @blackbox mention to CLI format
+            comment_body = f"/{command}"
+            if rest_of_comment:
+                comment_body += f" {rest_of_comment}"
+            get_logger().info(f"Converted @blackbox mention to command: {comment_body}")
+    
     if comment_body and isinstance(comment_body, str) and not comment_body.lstrip().startswith("/"):
         if '/ask' in comment_body and comment_body.strip().startswith('> ![image]'):
             comment_body_split = comment_body.split('/ask')
             comment_body = '/ask' + comment_body_split[1] +' \n' +comment_body_split[0].strip().lstrip('>')
             get_logger().info(f"Reformatting comment_body so command is at the beginning: {comment_body}")
         else:
-            get_logger().info("Ignoring comment not starting with /")
+            get_logger().info("Ignoring comment not starting with / or @blackbox mention")
             return {}
     disable_eyes = False
     if "issue" in body and "pull_request" in body["issue"] and "url" in body["issue"]["pull_request"]:
@@ -111,7 +126,6 @@ async def handle_comments_on_pr(body: Dict[str, Any],
     else:
         return {}
     log_context["api_url"] = api_url
-    comment_id = body.get("comment", {}).get("id")
     provider = get_git_provider_with_context(pr_url=api_url)
     with get_logger().contextualize(**log_context):
         if get_identity_provider().verify_eligibility("github", sender_id, api_url) is not Eligibility.NOT_ELIGIBLE:
