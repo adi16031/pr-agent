@@ -716,7 +716,7 @@ def _push_branch_and_create_pr(repo_root: Path, owner: str, repo_name: str, repo
 @app.route('/api/github/repos')
 def github_repos():
     """List repositories accessible by the configured GitHub token.
-    Falls back to public repos if no token is provided.
+    Falls back to public repos if no token is provided. 
     """
     import requests
     token = _get_github_token()
@@ -774,7 +774,7 @@ def github_repo_prs(owner, repo):
 
 @app.route('/api/github/repos/<owner>/<repo>/setup-automation', methods=['POST'])
 def setup_repo_automation(owner, repo):
-    """Setup GitHub Actions workflow for automated PR review, describe, and improve."""
+    """Setup GitHub Actions workflow for automated PR review, describe, and improve. """
     import requests
     import base64
     
