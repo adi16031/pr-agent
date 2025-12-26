@@ -37,6 +37,18 @@ def init_request_context(request: Request) -> None:
         context["settings"].set("GITHUB.USER_TOKEN", github_token)
 
 
+def _apply_openai_key_from_env() -> None:
+    openai_key = os.environ.get("OPENAI_KEY") or os.environ.get("OPENAI_API_KEY") or os.environ.get("OPENAI.KEY")
+    if openai_key:
+        get_settings().set("OPENAI.KEY", openai_key)
+
+
+def _apply_openai_api_base_from_env() -> None:
+    openai_api_base = os.environ.get("OPENAI_API_BASE") or os.environ.get("OPENAI.API_BASE")
+    if openai_api_base:
+        get_settings().set("OPENAI.API_BASE", openai_api_base)
+
+
 # Initialize FastAPI app
 app = FastAPI(
     title="PR Agent REST API",
@@ -517,6 +529,8 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.on_event("startup")
 async def startup_event():
+    _apply_openai_key_from_env()
+    _apply_openai_api_base_from_env()
     get_logger().info("PR Agent REST API Server starting up...")
 
 
