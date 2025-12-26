@@ -120,6 +120,7 @@ class PRReviewRequest(BaseModel):
     pr_url: str
     extra_instructions: Optional[str] = None
     ai_temperature: Optional[float] = None
+    include_code_suggestions: Optional[bool] = True
 
 
 class PRReviewResponse(BaseModel):
@@ -191,12 +192,22 @@ async def review_pr(request: PRReviewRequest, background_tasks: BackgroundTasks)
             settings.config.ai_temperature = request.ai_temperature
         
         # Execute review
+        get_settings().data = {}
         await pr_agent.handle_request(request.pr_url, "review")
-        
+        review_output = get_settings().data.get("artifact")
+
+        code_suggestions_output = None
+        if request.include_code_suggestions:
+            get_settings().data = {}
+            await pr_agent.handle_request(request.pr_url, "improve")
+            code_suggestions_output = get_settings().data.get("artifact")
+
         return {
             "status": "success",
             "message": "PR review completed",
-            "pr_url": request.pr_url
+            "pr_url": request.pr_url,
+            "review": review_output,
+            "code_suggestions": code_suggestions_output
         }
     except Exception as e:
         get_logger().error(f"Review failed: {str(e)}")

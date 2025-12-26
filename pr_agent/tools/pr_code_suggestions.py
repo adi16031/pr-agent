@@ -154,6 +154,7 @@ class PRCodeSuggestions:
                         pr_body += show_relevant_configurations(relevant_section='pr_code_suggestions')
 
                     # publish the PR comment
+                    get_settings().data = {"artifact": pr_body}
                     if get_settings().pr_code_suggestions.persistent_comment: # true by default
                         self.publish_persistent_comment_with_history(self.git_provider,
                                                                      pr_body,
@@ -213,6 +214,7 @@ class PRCodeSuggestions:
                 get_settings().pr_code_suggestions.get('publish_output_no_suggestions', True)):
             get_logger().warning('No code suggestions found for the PR.')
             get_logger().debug(f"PR output", artifact=pr_body)
+            get_settings().data = {"artifact": pr_body}
             if self.progress_response:
                 self.git_provider.edit_comment(self.progress_response, body=pr_body)
             else:
