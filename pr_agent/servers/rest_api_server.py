@@ -37,14 +37,24 @@ def init_request_context(request: Request) -> None:
         context["settings"].set("GITHUB.USER_TOKEN", github_token)
 
 
+def _normalize_env_value(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    return value.strip().strip('"').strip("'")
+
+
 def _apply_openai_key_from_env() -> None:
     openai_key = os.environ.get("OPENAI_KEY") or os.environ.get("OPENAI_API_KEY") or os.environ.get("OPENAI.KEY")
+    openai_key = _normalize_env_value(openai_key)
     if openai_key:
         get_settings().set("OPENAI.KEY", openai_key)
+        if not openai_key.startswith("sk-"):
+            get_logger().warning("OPENAI key does not start with 'sk-'; authentication may fail.")
 
 
 def _apply_openai_api_base_from_env() -> None:
     openai_api_base = os.environ.get("OPENAI_API_BASE") or os.environ.get("OPENAI.API_BASE")
+    openai_api_base = _normalize_env_value(openai_api_base)
     if openai_api_base:
         get_settings().set("OPENAI.API_BASE", openai_api_base)
 
