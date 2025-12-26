@@ -7,29 +7,43 @@ Or: python -m pr_agent.servers.rest_api_server
 """
 
 import asyncio
+import copy
 import os
 from typing import Optional
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 import json
+from starlette_context import context
+from starlette_context.middleware import RawContextMiddleware
+from starlette.middleware import Middleware
 
 from pr_agent.agent.pr_agent import PRAgent
-from pr_agent.config_loader import get_settings
+from pr_agent.config_loader import get_settings, global_settings
 from pr_agent.git_providers import get_git_provider
 from pr_agent.log import LoggingFormat, get_logger, setup_logger
 
 # Setup logging
 setup_logger(fmt=LoggingFormat.JSON, level=get_settings().get("CONFIG.LOG_LEVEL", "INFO"))
 
+def init_request_context(request: Request) -> None:
+    context["settings"] = copy.deepcopy(global_settings)
+    context["git_provider"] = {}
+    github_token = request.headers.get("X-GitHub-Token")
+    if github_token:
+        context["settings"].set("GITHUB.USER_TOKEN", github_token)
+
+
 # Initialize FastAPI app
 app = FastAPI(
     title="PR Agent REST API",
     description="AI-powered PR review, description, and improvement suggestions",
-    version="1.0.0"
+    version="1.0.0",
+    middleware=[Middleware(RawContextMiddleware)],
+    dependencies=[Depends(init_request_context)],
 )
 
 # Add CORS middleware
@@ -49,6 +63,7 @@ async def log_requests(request: Request, call_next):
     # Log incoming request
     logger.info(f"Incoming request: {request.method} {request.url.path}")
     logger.info(f"Headers: {dict(request.headers)}")
+    print(f"Headers: {dict(request.headers)}")
     
     # Try to read and log body for POST/PUT requests
     if request.method in ["POST", "PUT", "PATCH"]:
