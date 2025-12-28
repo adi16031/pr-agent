@@ -133,9 +133,9 @@ async def _run_with_token(pr_url: str, action: str, token: Optional[str]) -> Non
 def init_request_context(request: Request) -> None:
     context["settings"] = copy.deepcopy(global_settings)
     context["git_provider"] = {}
-    github_token = request.headers.get("X-GitHub-Token")
-    if github_token:
-        context["settings"].set("GITHUB.USER_TOKEN", github_token)
+    token = _resolve_request_token(None, request)
+    if token:
+        context["settings"].set("GITHUB.USER_TOKEN", token)
 
 
 def _normalize_env_value(value: Optional[str]) -> Optional[str]:
