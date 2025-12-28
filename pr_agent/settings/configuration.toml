@@ -89,21 +89,21 @@ extended_thinking_max_output_tokens = 4096
 # enable/disable features
 require_score_review=false
 require_tests_review=true
-require_estimate_effort_to_review=true
+require_estimate_effort_to_review=false
 require_can_be_split_review=false
 require_security_review=true
 require_estimate_contribution_time_cost=false
 require_todo_scan=false
 require_ticket_analysis_review=true
 # general options
-publish_output_no_suggestions=true # Set to "false" if you only need the reviewer's remarks (not labels, not "security audit", etc.) and want to avoid noisy "No major issues detected" comments.
+publish_output_no_suggestions=false # Set to "false" if you only need the reviewer's remarks (not labels, not "security audit", etc.) and want to avoid noisy "No major issues detected" comments.
 persistent_comment=true
 extra_instructions = ""
 num_max_findings = 3
 final_update_message = true
 # review labels
 enable_review_labels_security=true
-enable_review_labels_effort=true
+enable_review_labels_effort=false
 # specific configurations for incremental review (/review -i)
 require_all_thresholds_for_incremental_review=false
 minimal_commits_for_incremental_review=0
