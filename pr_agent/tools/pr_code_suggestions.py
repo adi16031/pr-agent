@@ -87,7 +87,7 @@ class PRCodeSuggestions:
                                           self.pr_code_suggestions_prompt_user)
 
         self.progress = f"## Generating PR code suggestions\n\n"
-        self.progress += f"""\nWork in progress ...<br>\n<img src="https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExcjBnZnp3aXZqeWthbTVzYnB3c2pocTBkeDV4eG5rdXpybDh6YjZrbiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3AMRa6DRUhMli/giphy.gif" width=48>"""
+        self.progress += f"""\nWork in progress ...<br>\n<img src="https://tenor.com/fxNaSneIhVZ.gif" width=48>"""
         self.progress_response = None
 
     async def run(self):
