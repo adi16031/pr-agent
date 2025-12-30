@@ -13,7 +13,6 @@ from pr_agent.algo.pr_processing import (add_ai_metadata_to_diff_files,
                                          get_pr_diff,
                                          retry_with_fallback_models)
 from pr_agent.algo.repo_context import get_repo_context
-from pr_agent.algo.repo_context_cache import get_cached_context, set_cached_context
 from pr_agent.algo.token_handler import TokenHandler
 from pr_agent.algo.utils import (ModelType, PRReviewHeader,
                                  convert_to_markdown_v2, github_action_output,
@@ -76,19 +75,11 @@ class PRReviewer:
             get_settings().set("config.enable_ai_metadata", False)
             get_logger().debug(f"AI metadata is disabled for this command")
 
-        # Get repository context for enhanced review with caching per repo
+        # Get repository context for enhanced review
         repo_context = ""
         try:
-            repo_full_name = getattr(self.git_provider, 'repo', '') or ''
-            # Try cache first
-            cached = get_cached_context(repo_full_name) if repo_full_name else None
-            if cached:
-                repo_context = cached
-            else:
-                modified_files = [f.filename for f in self.git_provider.get_diff_files()]
-                repo_context = get_repo_context(self.git_provider, modified_files)
-                if repo_full_name and repo_context:
-                    set_cached_context(repo_full_name, repo_context)
+            modified_files = [f.filename for f in self.git_provider.get_diff_files()]
+            repo_context = get_repo_context(self.git_provider, modified_files, pr_url=self.pr_url)
         except Exception as e:
             get_logger().debug(f"Failed to get repository context: {e}")
 

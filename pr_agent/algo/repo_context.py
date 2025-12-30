@@ -7,8 +7,10 @@ and codebase conventions to provide contextual insights.
 """
 
 import os
+import re
 import traceback
-from typing import Dict, List, Set, Optional, Tuple
+from tempfile import TemporaryDirectory
+from typing import Dict, List, Set, Optional
 from collections import defaultdict
 
 from pr_agent.log import get_logger
@@ -25,14 +27,18 @@ class RepoContextAnalyzer:
     def __init__(self, git_provider: GitProvider):
         self.git_provider = git_provider
         self.logger = get_logger()
-        self._cache = {}
+        self._repo_files_set: Optional[Set[str]] = None
+        self._repo_root: Optional[str] = None
 
-    def get_repository_context(self, modified_files: List[str]) -> Dict:
+    def get_repository_context(self, modified_files: List[str], repo_files: Optional[List[str]] = None,
+                               repo_root: Optional[str] = None) -> Dict:
         """
-        Extract comprehensive repository context based on modified files.
+        Extract comprehensive repository context based on repository-wide files.
 
         Args:
             modified_files: List of file paths that are modified in the PR
+            repo_files: Optional list of file paths representing the entire repo
+            repo_root: Optional filesystem path to the repo root for file content analysis
 
         Returns:
             Dictionary containing repository context insights
@@ -42,13 +48,17 @@ class RepoContextAnalyzer:
                 self.logger.debug("Repository context analysis is disabled")
                 return {}
 
+            analysis_files = repo_files or modified_files
+            self._set_repo_files(repo_files or [])
+            self._set_repo_root(repo_root)
+
             context = {
                 "related_files": self._get_related_files(modified_files),
-                "architectural_patterns": self._identify_architectural_patterns(modified_files),
-                "language_specific_conventions": self._get_language_conventions(modified_files),
+                "architectural_patterns": self._identify_architectural_patterns(analysis_files),
+                "language_specific_conventions": self._get_language_conventions(analysis_files),
                 "dependencies_impact": self._analyze_dependencies_impact(modified_files),
-                "code_patterns": self._extract_code_patterns(modified_files),
-                "similar_implementations": self._find_similar_implementations(modified_files),
+                "code_patterns": self._extract_code_patterns(analysis_files),
+                "similar_implementations": self._find_similar_implementations(analysis_files),
             }
 
             self.logger.debug(f"Repository context analysis completed", artifact=context)
@@ -87,6 +97,7 @@ class RepoContextAnalyzer:
             # Find related documentation
             related_files["documentation_files"] = self._find_related_docs(modified_files)
 
+            self._populate_import_relationships(modified_files, related_files)
             return related_files
         except Exception as e:
             self.logger.debug(f"Error analyzing related files: {e}")
@@ -162,22 +173,22 @@ class RepoContextAnalyzer:
 
         return docs
 
-    def _identify_architectural_patterns(self, modified_files: List[str]) -> Dict:
+    def _identify_architectural_patterns(self, repo_files: List[str]) -> Dict:
         """
         Identify architectural patterns and layers in the codebase.
         """
         try:
             patterns = {
-                "layers": self._detect_layers(modified_files),
-                "architecture_type": self._detect_architecture_type(modified_files),
-                "module_organization": self._analyze_module_organization(modified_files),
+                "layers": self._detect_layers(repo_files),
+                "architecture_type": self._detect_architecture_type(repo_files),
+                "module_organization": self._analyze_module_organization(repo_files),
             }
             return patterns
         except Exception as e:
             self.logger.debug(f"Error identifying architectural patterns: {e}")
             return {}
 
-    def _detect_layers(self, modified_files: List[str]) -> List[str]:
+    def _detect_layers(self, repo_files: List[str]) -> List[str]:
         """
         Detect if the project follows a layered architecture (e.g., models, views, controllers).
         """
@@ -192,24 +203,24 @@ class RepoContextAnalyzer:
             "utils": ["utils/", "util.py", "helpers/"],
         }
 
-        for file in modified_files:
+        for file in repo_files:
             for layer, patterns in layer_indicators.items():
                 if any(pattern in file for pattern in patterns):
                     layers.add(layer)
 
         return list(layers)
 
-    def _detect_architecture_type(self, modified_files: List[str]) -> str:
+    def _detect_architecture_type(self, repo_files: List[str]) -> str:
         """
         Detect the architecture type (MVC, microservices, monolithic, etc.).
         """
         architecture = "unknown"
 
         # Check for microservices indicators
-        if any("service" in f for f in modified_files) and any("api" in f for f in modified_files):
+        if any("service" in f for f in repo_files) and any("api" in f for f in repo_files):
             architecture = "microservices"
         # Check for MVC indicators
-        elif any(layer in modified_files for layer in ["models", "views", "controllers"]):
+        elif any(layer in repo_files for layer in ["models", "views", "controllers"]):
             architecture = "mvc"
         # Check for module-based architecture
         elif self._detect_module_based():
@@ -229,12 +240,12 @@ class RepoContextAnalyzer:
         except Exception:
             return False
 
-    def _analyze_module_organization(self, modified_files: List[str]) -> Dict:
+    def _analyze_module_organization(self, repo_files: List[str]) -> Dict:
         """
         Analyze how modules are organized in the project.
         """
         modules = defaultdict(list)
-        for file in modified_files:
+        for file in repo_files:
             parts = file.split("/")
             if len(parts) > 1:
                 module = parts[0]
@@ -242,18 +253,18 @@ class RepoContextAnalyzer:
 
         return dict(modules)
 
-    def _get_language_conventions(self, modified_files: List[str]) -> Dict:
+    def _get_language_conventions(self, repo_files: List[str]) -> Dict:
         """
         Extract language-specific conventions and patterns.
         """
         conventions = {
-            "primary_language": self._detect_primary_language(modified_files),
-            "naming_conventions": self._extract_naming_conventions(modified_files),
-            "import_style": self._detect_import_style(modified_files),
+            "primary_language": self._detect_primary_language(repo_files),
+            "naming_conventions": self._extract_naming_conventions(repo_files),
+            "import_style": self._detect_import_style(repo_files),
         }
         return conventions
 
-    def _detect_primary_language(self, modified_files: List[str]) -> str:
+    def _detect_primary_language(self, repo_files: List[str]) -> str:
         """
         Detect the primary programming language used in modified files.
         """
@@ -269,7 +280,7 @@ class RepoContextAnalyzer:
             ".cs": "csharp",
         }
 
-        for file in modified_files:
+        for file in repo_files:
             ext = os.path.splitext(file)[1]
             if ext in language_map:
                 ext_count[language_map[ext]] += 1
@@ -278,7 +289,7 @@ class RepoContextAnalyzer:
             return max(ext_count, key=ext_count.get)
         return "unknown"
 
-    def _extract_naming_conventions(self, modified_files: List[str]) -> Dict:
+    def _extract_naming_conventions(self, repo_files: List[str]) -> Dict:
         """
         Extract naming conventions used in the project.
         """
@@ -288,9 +299,9 @@ class RepoContextAnalyzer:
         }
 
         # Analyze file naming patterns
-        snake_case_files = sum(1 for f in modified_files if "_" in os.path.basename(f))
-        kebab_case_files = sum(1 for f in modified_files if "-" in os.path.basename(f))
-        camel_case_files = sum(1 for f in modified_files if os.path.basename(f)[0].islower() and any(c.isupper() for c in os.path.basename(f)))
+        snake_case_files = sum(1 for f in repo_files if "_" in os.path.basename(f))
+        kebab_case_files = sum(1 for f in repo_files if "-" in os.path.basename(f))
+        camel_case_files = sum(1 for f in repo_files if os.path.basename(f)[0].islower() and any(c.isupper() for c in os.path.basename(f)))
 
         if snake_case_files > kebab_case_files and snake_case_files > camel_case_files:
             conventions["file_naming"] = "snake_case"
@@ -301,7 +312,7 @@ class RepoContextAnalyzer:
 
         return conventions
 
-    def _detect_import_style(self, modified_files: List[str]) -> str:
+    def _detect_import_style(self, repo_files: List[str]) -> str:
         """
         Detect the import style used in the project (absolute vs relative imports).
         """
@@ -326,7 +337,7 @@ class RepoContextAnalyzer:
 
         return impact
 
-    def _extract_code_patterns(self, modified_files: List[str]) -> Dict:
+    def _extract_code_patterns(self, repo_files: List[str]) -> Dict:
         """
         Extract common code patterns and practices used in the repository.
         """
@@ -334,12 +345,12 @@ class RepoContextAnalyzer:
             "uses_decorators": False,
             "uses_interfaces": False,
             "uses_inheritance": False,
-            "testing_framework": self._detect_testing_framework(modified_files),
+            "testing_framework": self._detect_testing_framework(repo_files),
             "logging_approach": "standard",
         }
         return patterns
 
-    def _detect_testing_framework(self, modified_files: List[str]) -> str:
+    def _detect_testing_framework(self, repo_files: List[str]) -> str:
         """
         Detect the testing framework used in the project.
         """
@@ -354,13 +365,13 @@ class RepoContextAnalyzer:
         }
 
         # Look for test dependencies
-        for file in modified_files:
+        for file in repo_files:
             if "test" in file.lower():
                 return "detected"
 
         return "unknown"
 
-    def _find_similar_implementations(self, modified_files: List[str]) -> List[str]:
+    def _find_similar_implementations(self, repo_files: List[str]) -> List[str]:
         """
         Find similar implementations in the codebase that could be referenced or refactored.
         """
@@ -374,10 +385,168 @@ class RepoContextAnalyzer:
         Check if a file exists in the repository.
         """
         try:
-            # This is a simplified check - in production, we'd use git provider methods
-            return False  # Placeholder
+            if self._repo_files_set is not None:
+                return file_path in self._repo_files_set
+            return False
         except Exception:
             return False
+
+    def _set_repo_files(self, repo_files: List[str]) -> None:
+        if repo_files:
+            self._repo_files_set = set(repo_files)
+        else:
+            self._repo_files_set = None
+
+    def _set_repo_root(self, repo_root: Optional[str]) -> None:
+        self._repo_root = repo_root
+
+    def _populate_import_relationships(self, modified_files: List[str], related_files: Dict[str, List[str]]) -> None:
+        if not self._repo_root or not self._repo_files_set:
+            return
+
+        imports_from = set()
+        imported_by = set()
+        repo_files = list(self._repo_files_set)
+
+        imports_from_map = {}
+        imported_by_map = {}
+        for repo_file in repo_files:
+            if not self._is_import_scannable(repo_file):
+                continue
+            contents = self._read_repo_file(repo_file)
+            if not contents:
+                continue
+            resolved_imports = self._resolve_imports(repo_file, contents)
+            if not resolved_imports:
+                continue
+            imports_from_map[repo_file] = resolved_imports
+            for imported in resolved_imports:
+                imported_by_map.setdefault(imported, set()).add(repo_file)
+
+        for file in modified_files:
+            imports_from.update(imports_from_map.get(file, set()))
+            imported_by.update(imported_by_map.get(file, set()))
+
+        related_files["imports_from"] = sorted(imports_from)
+        related_files["imported_by"] = sorted(imported_by)
+
+    def _read_repo_file(self, rel_path: str) -> str:
+        if not self._repo_root:
+            return ""
+        abs_path = os.path.join(self._repo_root, rel_path)
+        try:
+            with open(abs_path, "r", encoding="utf-8", errors="ignore") as handle:
+                return handle.read()
+        except Exception:
+            return ""
+
+    def _is_import_scannable(self, file_path: str) -> bool:
+        return os.path.splitext(file_path)[1] in {".py", ".js", ".ts", ".jsx", ".tsx", ".mjs", ".cjs"}
+
+    def _resolve_imports(self, file_path: str, contents: str) -> Set[str]:
+        ext = os.path.splitext(file_path)[1]
+        if ext == ".py":
+            return self._resolve_python_imports(file_path, contents)
+        return self._resolve_js_imports(file_path, contents)
+
+    def _resolve_python_imports(self, file_path: str, contents: str) -> Set[str]:
+        results = set()
+        for match in re.finditer(r"^\s*import\s+([a-zA-Z0-9_.,\s]+)", contents, re.MULTILINE):
+            modules_raw = match.group(1)
+            for module in modules_raw.split(","):
+                module_name = module.strip().split(" as ")[0].strip()
+                results.update(self._resolve_python_module(file_path, module_name))
+
+        for match in re.finditer(r"^\s*from\s+([a-zA-Z0-9_\.]+)\s+import\s+", contents, re.MULTILINE):
+            module_name = match.group(1).strip()
+            results.update(self._resolve_python_module(file_path, module_name))
+        return results
+
+    def _resolve_python_module(self, file_path: str, module_name: str) -> Set[str]:
+        if not module_name:
+            return set()
+        base_dir = os.path.dirname(file_path)
+        if module_name.startswith("."):
+            leading = len(module_name) - len(module_name.lstrip("."))
+            rel_module = module_name.lstrip(".")
+            target_dir = base_dir
+            for _ in range(max(leading - 1, 0)):
+                target_dir = os.path.dirname(target_dir)
+            if rel_module:
+                target_dir = os.path.normpath(os.path.join(target_dir, rel_module.replace(".", "/")))
+            else:
+                target_dir = os.path.normpath(target_dir)
+        else:
+            target_dir = module_name.replace(".", "/")
+
+        candidates = [
+            f"{target_dir}.py",
+            os.path.join(target_dir, "__init__.py"),
+        ]
+        return self._filter_existing_candidates(candidates)
+
+    def _resolve_js_imports(self, file_path: str, contents: str) -> Set[str]:
+        results = set()
+        patterns = [
+            r"^\s*import\s+.*?\s+from\s+['\"]([^'\"]+)['\"]",
+            r"^\s*import\s+['\"]([^'\"]+)['\"]",
+            r"require\(\s*['\"]([^'\"]+)['\"]\s*\)",
+        ]
+        for pattern in patterns:
+            for match in re.finditer(pattern, contents, re.MULTILINE):
+                module_name = match.group(1).strip()
+                results.update(self._resolve_js_module(file_path, module_name))
+        return results
+
+    def _resolve_js_module(self, file_path: str, module_name: str) -> Set[str]:
+        if not module_name.startswith("."):
+            return set()
+        base_dir = os.path.dirname(file_path)
+        rel_path = os.path.normpath(os.path.join(base_dir, module_name))
+        rel_path = rel_path.replace(os.sep, "/")
+
+        candidates = []
+        if os.path.splitext(rel_path)[1]:
+            candidates.append(rel_path)
+        else:
+            for ext in [".js", ".ts", ".jsx", ".tsx", ".mjs", ".cjs"]:
+                candidates.append(f"{rel_path}{ext}")
+            for ext in [".js", ".ts", ".jsx", ".tsx", ".mjs", ".cjs"]:
+                candidates.append(f"{rel_path}/index{ext}")
+        return self._filter_existing_candidates(candidates)
+
+    def _filter_existing_candidates(self, candidates: List[str]) -> Set[str]:
+        if not self._repo_files_set:
+            return set()
+        normalized = {c.replace(os.sep, "/") for c in candidates}
+        return {c for c in normalized if c in self._repo_files_set}
+
+    def _list_repo_files(self, repo_root: str) -> List[str]:
+        repo_files = []
+        max_files = int(get_settings().config.get("repo_context_max_files", 50))
+
+        for root, dirs, files in os.walk(repo_root):
+            dirs[:] = [d for d in dirs if d not in {".git", ".hg", ".svn"}]
+            for file in files:
+                rel_path = os.path.relpath(os.path.join(root, file), repo_root)
+                rel_path = rel_path.replace(os.sep, "/")
+                repo_files.append(rel_path)
+                if max_files > 0 and len(repo_files) >= max_files:
+                    return repo_files
+        return repo_files
+
+    def get_repo_root_from_provider(self, pr_url: Optional[str]) -> Optional[str]:
+        try:
+            repo_path = getattr(self.git_provider, "repo_path", None)
+            if repo_path:
+                return str(repo_path)
+            repo_url = self.git_provider.get_git_repo_url(pr_url) if pr_url else ""
+            if repo_url:
+                return repo_url
+            return None
+        except Exception as e:
+            self.logger.debug(f"Error fetching repository root: {e}")
+            return None
 
 
 class RepositoryContextProvider:
@@ -389,12 +558,42 @@ class RepositoryContextProvider:
         self.analyzer = RepoContextAnalyzer(git_provider)
         self.logger = get_logger()
 
-    def get_context_str(self, modified_files: List[str]) -> str:
+    def get_context_str(self, modified_files: List[str], pr_url: Optional[str] = None) -> str:
         """
         Get a formatted string representation of repository context.
         """
         try:
-            context = self.analyzer.get_repository_context(modified_files)
+            if get_settings().config.get("repo_context_enabled", False) is False:
+                return ""
+            repo_root = self.analyzer.get_repo_root_from_provider(pr_url)
+            repo_files = []
+            if repo_root and os.path.isdir(repo_root):
+                repo_files = self.analyzer._list_repo_files(repo_root)
+                if repo_files:
+                    self.logger.debug("Using repository-wide files for context analysis",
+                                      artifact={"num_files": len(repo_files)})
+                context = self.analyzer.get_repository_context(
+                    modified_files,
+                    repo_files=repo_files or None,
+                    repo_root=repo_root,
+                )
+            elif repo_root and isinstance(repo_root, str):
+                with TemporaryDirectory() as tmp_dir:
+                    returned_repo = self.analyzer.git_provider.clone(repo_root, tmp_dir, remove_dest_folder=False)
+                    if not returned_repo:
+                        context = self.analyzer.get_repository_context(modified_files)
+                    else:
+                        repo_files = self.analyzer._list_repo_files(returned_repo.path)
+                        if repo_files:
+                            self.logger.debug("Using repository-wide files for context analysis",
+                                              artifact={"num_files": len(repo_files)})
+                        context = self.analyzer.get_repository_context(
+                            modified_files,
+                            repo_files=repo_files or None,
+                            repo_root=returned_repo.path,
+                        )
+            else:
+                context = self.analyzer.get_repository_context(modified_files)
 
             if not context:
                 return ""
@@ -466,13 +665,13 @@ class RepositoryContextProvider:
         return "\n".join(parts)
 
 
-def get_repo_context(git_provider: GitProvider, modified_files: List[str]) -> str:
+def get_repo_context(git_provider: GitProvider, modified_files: List[str], pr_url: Optional[str] = None) -> str:
     """
     Convenience function to get formatted repository context.
     """
     try:
         provider = RepositoryContextProvider(git_provider)
-        return provider.get_context_str(modified_files)
+        return provider.get_context_str(modified_files, pr_url=pr_url)
     except Exception as e:
         get_logger().warning(f"Failed to get repository context: {e}")
         return ""
