@@ -5,76 +5,134 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>PR-Agent — Repo UI</title>
     <style>
+      @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
       :root[data-theme="light"] {
-        --bg-primary: #ffffff;
-        --bg-secondary: #f8f9fa;
-        --bg-tertiary: #f1f3f5;
-        --bg-hover: #e9ecef;
-        --bg-selected: #e3f2fd;
-        --border-color: #dee2e6;
-        --border-light: #e9ecef;
-        --text-primary: #212529;
-        --text-secondary: #6c757d;
-        --text-muted: #868e96;
-        --accent-primary: #2196f3;
-        --accent-hover: #1976d2;
-        --success-bg: #d4edda;
-        --success-text: #155724;
-        --success-border: #c3e6cb;
-        --error-bg: #f8d7da;
-        --error-text: #721c24;
-        --error-border: #f5c6cb;
-        --info-bg: #e7f3ff;
-        --info-text: #004085;
-        --info-border: #b3d9ff;
-        --modal-overlay: rgba(0, 0, 0, 0.5);
-        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-        --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
-        --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+        --bg-primary: #f6f1ea;
+        --bg-secondary: #ffffff;
+        --bg-tertiary: #f1ebe2;
+        --bg-hover: #efe6da;
+        --bg-selected: #e2f3f1;
+        --border-color: #e4ddd3;
+        --border-light: #f2ece2;
+        --text-primary: #1f2428;
+        --text-secondary: #5d6670;
+        --text-muted: #8a9199;
+        --accent-primary: #0f766e;
+        --accent-hover: #0d9488;
+        --accent-alt: #0891b2;
+        --success-bg: #e6f6ea;
+        --success-text: #1d6b3b;
+        --success-border: #cdeed6;
+        --error-bg: #fdeceb;
+        --error-text: #9b2d2d;
+        --error-border: #f7c9c6;
+        --info-bg: #e9f4fb;
+        --info-text: #115b7a;
+        --info-border: #c7e2f2;
+        --modal-overlay: rgba(15, 15, 15, 0.55);
+        --shadow-sm: 0 8px 18px rgba(35, 38, 47, 0.08);
+        --shadow-md: 0 14px 30px rgba(35, 38, 47, 0.12);
+        --shadow-lg: 0 24px 60px rgba(35, 38, 47, 0.16);
       }
       
       :root[data-theme="dark"] {
-        --bg-primary: #1a1a1a;
-        --bg-secondary: #242424;
-        --bg-tertiary: #2d2d2d;
-        --bg-hover: #333333;
-        --bg-selected: #1e3a5f;
-        --border-color: #404040;
-        --border-light: #333333;
-        --text-primary: #e9ecef;
-        --text-secondary: #adb5bd;
-        --text-muted: #868e96;
-        --accent-primary: #42a5f5;
-        --accent-hover: #64b5f6;
-        --success-bg: #1e4620;
-        --success-text: #a3d9a5;
-        --success-border: #2d5f2e;
-        --error-bg: #5a1a1a;
-        --error-text: #f1aeb5;
-        --error-border: #842029;
-        --info-bg: #1a3a52;
-        --info-text: #9fc5e8;
-        --info-border: #2c5282;
-        --modal-overlay: rgba(0, 0, 0, 0.7);
-        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-        --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-        --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+        --bg-primary: #0f1518;
+        --bg-secondary: #141c20;
+        --bg-tertiary: #1b2429;
+        --bg-hover: #202c31;
+        --bg-selected: #18323a;
+        --border-color: #253037;
+        --border-light: #1b2429;
+        --text-primary: #eef2f6;
+        --text-secondary: #b1bbc3;
+        --text-muted: #7f8a93;
+        --accent-primary: #2dd4bf;
+        --accent-hover: #5eead4;
+        --accent-alt: #38bdf8;
+        --success-bg: #0f2b1f;
+        --success-text: #7ae2b0;
+        --success-border: #1f5b3e;
+        --error-bg: #3b1518;
+        --error-text: #f6b4b8;
+        --error-border: #5c242a;
+        --info-bg: #102836;
+        --info-text: #9ad6f0;
+        --info-border: #1b4b60;
+        --modal-overlay: rgba(7, 9, 10, 0.7);
+        --shadow-sm: 0 10px 24px rgba(0, 0, 0, 0.35);
+        --shadow-md: 0 18px 36px rgba(0, 0, 0, 0.45);
+        --shadow-lg: 0 28px 64px rgba(0, 0, 0, 0.55);
       }
       
       * { margin: 0; padding: 0; box-sizing: border-box; }
       
       body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        font-family: 'Space Grotesk', 'Helvetica Neue', Helvetica, sans-serif;
         background: var(--bg-primary);
         color: var(--text-primary);
         transition: background-color 0.3s ease, color 0.3s ease;
+        min-height: 100vh;
+      }
+
+      .ambient-bg {
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
+        z-index: 0;
+        pointer-events: none;
+      }
+
+      .ambient-bg .orb {
+        position: absolute;
+        width: 480px;
+        height: 480px;
+        border-radius: 50%;
+        filter: blur(80px);
+        opacity: 0.35;
+        animation: float 18s ease-in-out infinite;
+      }
+
+      .ambient-bg .orb-1 {
+        background: radial-gradient(circle at 30% 30%, rgba(15, 118, 110, 0.6), transparent 65%);
+        top: -120px;
+        left: -160px;
+      }
+
+      .ambient-bg .orb-2 {
+        background: radial-gradient(circle at 70% 30%, rgba(8, 145, 178, 0.5), transparent 65%);
+        bottom: -160px;
+        right: -140px;
+        animation-delay: -6s;
+      }
+
+      .ambient-bg .orb-3 {
+        background: radial-gradient(circle at 40% 60%, rgba(255, 196, 81, 0.35), transparent 60%);
+        top: 40%;
+        right: 18%;
+        width: 360px;
+        height: 360px;
+        animation-delay: -12s;
+      }
+
+      @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(24px); }
+      }
+
+      .app-shell {
+        position: relative;
+        z-index: 1;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
       }
       
       /* Header */
       .header {
-        background: var(--bg-secondary);
+        background: color-mix(in srgb, var(--bg-secondary) 88%, transparent);
         border-bottom: 1px solid var(--border-color);
-        padding: 12px 24px;
+        padding: 16px 28px;
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -82,6 +140,7 @@
         top: 0;
         z-index: 100;
         box-shadow: var(--shadow-sm);
+        backdrop-filter: blur(14px);
       }
       
       .header-title {
@@ -90,7 +149,11 @@
         color: var(--text-primary);
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 12px;
+      }
+
+      .header-title span {
+        font-size: 22px;
       }
       
       .header-actions {
@@ -103,7 +166,7 @@
       .theme-switcher {
         background: var(--bg-tertiary);
         border: 1px solid var(--border-color);
-        border-radius: 8px;
+        border-radius: 999px;
         padding: 4px;
         display: flex;
         gap: 4px;
@@ -114,7 +177,7 @@
         background: transparent;
         border: none;
         padding: 8px 12px;
-        border-radius: 6px;
+        border-radius: 999px;
         cursor: pointer;
         color: var(--text-secondary);
         transition: all 0.2s ease;
@@ -138,8 +201,8 @@
         background: var(--bg-tertiary);
         color: var(--text-primary);
         border: 1px solid var(--border-color);
-        padding: 8px 16px;
-        border-radius: 8px;
+        padding: 10px 18px;
+        border-radius: 999px;
         cursor: pointer;
         font-size: 14px;
         font-weight: 500;
@@ -157,17 +220,21 @@
       
       /* Container */
       #container {
-        display: flex;
-        height: calc(100vh - 57px);
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 20px;
+        padding: 24px;
+        height: calc(100vh - 72px);
       }
       
       /* Left Sidebar */
       #left {
-        width: 300px;
-        border-right: 1px solid var(--border-color);
-        padding: 20px;
+        border: 1px solid var(--border-color);
+        border-radius: 18px;
+        padding: 22px;
         overflow-y: auto;
         background: var(--bg-secondary);
+        box-shadow: var(--shadow-sm);
       }
       
       #left h3 {
@@ -182,23 +249,34 @@
       /* Right Content */
       #right {
         flex: 1;
-        padding: 24px;
+        padding: 26px;
         overflow-y: auto;
-        background: var(--bg-primary);
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 22px;
+        box-shadow: var(--shadow-md);
       }
       
       #right h3 {
-        font-size: 24px;
+        font-size: 26px;
         font-weight: 600;
-        margin-bottom: 20px;
+        margin-bottom: 18px;
         color: var(--text-primary);
+      }
+
+      .section-card {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-light);
+        border-radius: 14px;
+        padding: 14px 16px;
+        margin-bottom: 16px;
       }
       
       /* Repo Items */
       .repo-item {
         padding: 12px 14px;
         cursor: pointer;
-        border-radius: 8px;
+        border-radius: 12px;
         margin-bottom: 6px;
         transition: all 0.2s ease;
         font-size: 14px;
@@ -206,6 +284,7 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
+        background: transparent;
       }
       
       .repo-item:hover {
@@ -215,7 +294,8 @@
       
       .selected {
         background: var(--bg-selected) !important;
-        font-weight: 500;
+        font-weight: 600;
+        box-shadow: var(--shadow-sm);
       }
       
       /* Badges */
@@ -236,11 +316,11 @@
       }
       
       .automation-btn {
-        background: var(--accent-primary);
+        background: linear-gradient(135deg, var(--accent-primary), var(--accent-alt));
         color: white;
         border: none;
         padding: 10px 20px;
-        border-radius: 8px;
+        border-radius: 10px;
         cursor: pointer;
         font-size: 14px;
         font-weight: 500;
@@ -262,11 +342,11 @@
       }
       
       .btn-primary {
-        background: linear-gradient(135deg, #28a745, #20c997);
+        background: linear-gradient(135deg, #1f8f62, #28c28e);
         color: white;
         border: none;
         padding: 10px 24px;
-        border-radius: 8px;
+        border-radius: 10px;
         cursor: pointer;
         font-size: 14px;
         font-weight: 500;
@@ -290,7 +370,7 @@
         color: white;
         border: none;
         padding: 10px 20px;
-        border-radius: 8px;
+        border-radius: 10px;
         cursor: pointer;
         font-size: 14px;
         font-weight: 500;
@@ -348,7 +428,7 @@
       pre {
         background: var(--bg-tertiary);
         padding: 16px;
-        border-radius: 8px;
+        border-radius: 12px;
         overflow: auto;
         font-size: 13px;
         border: 1px solid var(--border-color);
@@ -360,7 +440,7 @@
         padding: 2px 6px;
         border-radius: 4px;
         font-size: 12px;
-        font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+        font-family: 'IBM Plex Mono', 'SF Mono', Monaco, monospace;
       }
       
       /* Modal */
@@ -499,13 +579,14 @@
         gap: 12px;
         margin-bottom: 20px;
         align-items: center;
+        flex-wrap: wrap;
       }
       
       #controls input {
         flex: 1;
         padding: 10px 14px;
         border: 1px solid var(--border-color);
-        border-radius: 8px;
+        border-radius: 10px;
         font-size: 14px;
         background: var(--bg-secondary);
         color: var(--text-primary);
@@ -521,7 +602,7 @@
         background: var(--accent-primary);
         color: white;
         border: none;
-        border-radius: 8px;
+        border-radius: 10px;
         cursor: pointer;
         font-size: 14px;
         font-weight: 500;
@@ -535,17 +616,72 @@
       
       /* PR List */
       .pr-item {
-        padding: 16px;
-        border-bottom: 1px solid var(--border-light);
-        transition: background 0.2s ease;
+        padding: 14px;
+        border: 1px solid var(--border-light);
+        border-radius: 12px;
+        transition: background 0.2s ease, border 0.2s ease, transform 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        background: var(--bg-secondary);
+        box-shadow: var(--shadow-sm);
       }
       
       .pr-item:hover {
-        background: var(--bg-secondary);
+        background: var(--bg-hover);
+        border-color: var(--border-color);
+        transform: translateY(-1px);
       }
       
       .pr-item:last-child {
-        border-bottom: none;
+        margin-bottom: 0;
+      }
+
+      .pr-main {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .pr-title {
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--text-primary);
+      }
+
+      .pr-number {
+        color: var(--accent-primary);
+        font-weight: 600;
+        margin-right: 6px;
+      }
+
+      .pr-meta {
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      .pr-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .btn-ghost {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1px solid var(--border-color);
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .btn-ghost:hover {
+        border-color: var(--accent-primary);
+        color: var(--accent-primary);
+        transform: translateY(-1px);
       }
       
       /* Scrollbar Styling */
@@ -609,30 +745,81 @@
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
       }
+
+      .repo-summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        border-radius: 14px;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-light);
+        margin-bottom: 16px;
+      }
+
+      .repo-summary .label {
+        font-size: 12px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 4px;
+      }
+
+      .repo-summary .value {
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .chip {
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--accent-primary) 12%, var(--bg-secondary));
+        color: var(--accent-primary);
+        font-weight: 600;
+        font-size: 12px;
+      }
+
+      @media (max-width: 980px) {
+        #container {
+          grid-template-columns: 1fr;
+          height: auto;
+        }
+
+        #left {
+          max-height: 40vh;
+        }
+      }
     </style>
   </head>
   <body>
-    <!-- Header -->
-    <div class="header">
-      <div class="header-title">
-        <span>🤖</span>
-        PR-Agent
-      </div>
-      <div class="header-actions">
-        <div class="theme-switcher">
-          <button class="theme-btn active" data-theme="light" onclick="setTheme('light')" title="Light Mode">
-            ☀️
-          </button>
-          <button class="theme-btn" data-theme="dark" onclick="setTheme('dark')" title="Dark Mode">
-            🌙
+    <div class="ambient-bg">
+      <span class="orb orb-1"></span>
+      <span class="orb orb-2"></span>
+      <span class="orb orb-3"></span>
+    </div>
+
+    <div class="app-shell">
+      <!-- Header -->
+      <div class="header">
+        <div class="header-title">
+          <span>🤖</span>
+          PR-Agent
+        </div>
+        <div class="header-actions">
+          <div class="theme-switcher">
+            <button class="theme-btn active" data-theme="light" onclick="setTheme('light')" title="Light Mode">
+              ☀️
+            </button>
+            <button class="theme-btn" data-theme="dark" onclick="setTheme('dark')" title="Dark Mode">
+              🌙
+            </button>
+          </div>
+          <button class="settings-btn" onclick="openSettings()">
+            <span>⚙️</span>
+            <span>Settings</span>
           </button>
         </div>
-        <button class="settings-btn" onclick="openSettings()">
-          <span>⚙️</span>
-          <span>Settings</span>
-        </button>
       </div>
-    </div>
     
     <!-- Settings Modal -->
     <div id="settingsModal" class="modal">
@@ -685,29 +872,30 @@
       </div>
       <div id="right">
         <h3 id="title">Select a repo</h3>
-        <div id="automation-section" style="display:none; margin-bottom:16px;">
+        <div id="automation-section" class="section-card" style="display:none; margin-bottom:16px;">
           <button id="btn_toggle_automation" class="automation-btn">Enable Automated PR Review</button>
           <div id="automation-status" class="automation-status" style="display:none;"></div>
           <p style="font-size:13px; color:var(--text-muted); margin-top:8px;">
             When enabled, all new PRs will automatically get review, description, and improvement suggestions.
           </p>
         </div>
-        <div id="vuln-section" style="display:none; margin-bottom:16px;">
+        <div id="vuln-section" class="section-card" style="display:none; margin-bottom:16px;">
           <button id="btn_scan_vuln" class="automation-btn" style="background: linear-gradient(135deg, #f59f00, #f76707);">Scan Vulnerabilities & Raise PR</button>
           <div id="vuln-status" class="automation-status" style="display:none;"></div>
           <p style="font-size:13px; color:var(--text-muted); margin-top:8px;">
             Triggers a GitHub Actions workflow on the repo to run pip-audit remotely and open a PR with the report.
           </p>
         </div>
-        <div id="controls" style="margin-bottom:12px; display:none">
+        <div id="controls" class="section-card" style="margin-bottom:12px; display:none">
           <input id="pr_url" type="text" placeholder="https://github.com/org/repo/pull/123" style="width:70%" />
           <button id="btn_review">Review</button>
           <button id="btn_describe">Describe</button>
           <button id="btn_improve">Improve</button>
         </div>
-        <div id="content">Click a repository on the left to view details.</div>
-        <pre id="stream_output" style="white-space:pre-wrap; max-height:40vh; overflow:auto; display:none"></pre>
+        <div id="content" class="section-card">Click a repository on the left to view details.</div>
+        <pre id="stream_output" class="section-card" style="white-space:pre-wrap; max-height:40vh; overflow:auto; display:none"></pre>
       </div>
+    </div>
     </div>
 
     <div id="scan-overlay" class="scan-overlay">
@@ -809,9 +997,15 @@
         const content = document.getElementById('content')
         title.textContent = fullname
         content.innerHTML = `
-          <p><strong>Repository:</strong> ${fullname}</p>
-          <div id="pr-section">
-            <p><strong>Open PRs:</strong></p>
+          <div class="repo-summary">
+            <div>
+              <div class="label">Repository</div>
+              <div class="value">${fullname}</div>
+            </div>
+            <div class="chip">Connected</div>
+          </div>
+          <div id="pr-section" class="section-card">
+            <div class="label" style="margin-bottom:8px;">Open PRs</div>
             <div id="pr-list">Loading PRs...</div>
           </div>
         `
@@ -852,21 +1046,26 @@
           list.innerHTML = ''
           j.prs.forEach(pr=>{
             const item = document.createElement('div')
-            item.style.padding='8px'
-            item.style.borderBottom='1px solid #eee'
-            item.innerHTML = `<strong>#${pr.number}</strong> ${pr.title} <small>by ${pr.user}</small>`
+            item.className = 'pr-item'
+            item.innerHTML = `
+              <div class="pr-main">
+                <div class="pr-title"><span class="pr-number">#${pr.number}</span>${pr.title}</div>
+                <div class="pr-meta">by ${pr.user}</div>
+              </div>
+            `
             const btns = document.createElement('span')
-            btns.style.float='right'
+            btns.className = 'pr-actions'
             const reviewBtn = document.createElement('button')
+            reviewBtn.className = 'btn-ghost'
             reviewBtn.textContent = 'Review'
             reviewBtn.onclick = ()=> runAction(fullname,'review', pr.html_url)
             const descBtn = document.createElement('button')
+            descBtn.className = 'btn-ghost'
             descBtn.textContent = 'Describe'
-            descBtn.style.marginLeft='6px'
             descBtn.onclick = ()=> runAction(fullname,'describe', pr.html_url)
             const impBtn = document.createElement('button')
+            impBtn.className = 'btn-ghost'
             impBtn.textContent = 'Improve'
-            impBtn.style.marginLeft='6px'
             impBtn.onclick = ()=> runAction(fullname,'improve', pr.html_url)
             btns.appendChild(reviewBtn)
             btns.appendChild(descBtn)
