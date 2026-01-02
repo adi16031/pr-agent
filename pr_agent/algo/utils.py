@@ -194,18 +194,13 @@ def convert_to_markdown_v2(output_data: dict,
                 markdown_text += f"### {emoji} {key_nice}: {value}\n\n"
         elif 'relevant tests' in key_nice.lower():
             value = str(value).strip().lower()
+            tests_text = "Tests: not detected" if is_value_no(value) else "Tests: detected"
             if gfm_supported:
                 markdown_text += f"<tr><td>"
-                if is_value_no(value):
-                    markdown_text += f"{emoji}&nbsp;<strong>No relevant tests</strong>"
-                else:
-                    markdown_text += f"{emoji}&nbsp;<strong>PR contains tests</strong>"
+                markdown_text += f"{emoji}&nbsp;<strong>{tests_text}</strong>"
                 markdown_text += f"</td></tr>\n"
             else:
-                if is_value_no(value):
-                    markdown_text += f'### {emoji} No relevant tests\n\n'
-                else:
-                    markdown_text += f"### {emoji} PR contains tests\n\n"
+                markdown_text += f"### {emoji} {tests_text}\n\n"
         elif 'ticket compliance check' in key_nice.lower():
             markdown_text = ticket_markdown_logic(emoji, markdown_text, value, gfm_supported)
         elif 'contribution time cost estimate' in key_nice.lower():
@@ -220,7 +215,7 @@ def convert_to_markdown_v2(output_data: dict,
             if gfm_supported:
                 markdown_text += f"<tr><td>"
                 if is_value_no(value):
-                    markdown_text += f"{emoji}&nbsp;<strong>No security concerns identified</strong>"
+                    markdown_text += f"{emoji}&nbsp;<strong>No security concerns</strong>"
                 else:
                     markdown_text += f"{emoji}&nbsp;<strong>Security concerns</strong><br><br>\n\n"
                     value = emphasize_header(value.strip())
@@ -228,7 +223,7 @@ def convert_to_markdown_v2(output_data: dict,
                 markdown_text += f"</td></tr>\n"
             else:
                 if is_value_no(value):
-                    markdown_text += f'### {emoji} No security concerns identified\n\n'
+                    markdown_text += f'### {emoji} No security concerns\n\n'
                 else:
                     markdown_text += f"### {emoji} Security concerns\n\n"
                     value = emphasize_header(value.strip(), only_markdown=True)
@@ -260,10 +255,10 @@ def convert_to_markdown_v2(output_data: dict,
             if is_value_no(value):
                 if gfm_supported:
                     markdown_text += f"<tr><td>"
-                    markdown_text += f"{emoji}&nbsp;<strong>No major issues detected</strong>"
+                    markdown_text += f"{emoji}&nbsp;<strong>No high-priority issues detected</strong>"
                     markdown_text += f"</td></tr>\n"
                 else:
-                    markdown_text += f"### {emoji} No major issues detected\n\n"
+                    markdown_text += f"### {emoji} No high-priority issues detected\n\n"
             else:
                 issues = value
                 if gfm_supported:
@@ -292,17 +287,24 @@ def convert_to_markdown_v2(output_data: dict,
 
                         if gfm_supported:
                             if reference_link is not None and len(reference_link) > 0:
-                                if relevant_lines_str:
-                                    issue_str = f"<details><summary><a href='{reference_link}'><strong>{issue_header}</strong></a>\n\n{issue_content}\n</summary>\n\n{relevant_lines_str}\n\n</details>"
-                                else:
-                                    issue_str = f"<a href='{reference_link}'><strong>{issue_header}</strong></a><br>{issue_content}"
+                                header_html = f"<strong><a href='{reference_link}'>{issue_header}</a></strong>"
                             else:
-                                issue_str = f"<strong>{issue_header}</strong><br>{issue_content}"
+                                header_html = f"<strong>{issue_header}</strong>"
+                            summary_html = f"{header_html} - {issue_content}"
+                            file_html = f"<code>{relevant_file}:{start_line}-{end_line}</code>"
+                            if relevant_lines_str:
+                                issue_str = f"<details><summary>{summary_html}</summary>\n\n{file_html}\n\n{relevant_lines_str}\n\n</details>"
+                            else:
+                                issue_str = f"{summary_html}<br>{file_html}"
                         else:
                             if reference_link is not None and len(reference_link) > 0:
-                                issue_str = f"[**{issue_header}**]({reference_link})\n\n{issue_content}\n\n"
+                                header_md = f"[**{issue_header}**]({reference_link})"
                             else:
-                                issue_str = f"**{issue_header}**\n\n{issue_content}\n\n"
+                                header_md = f"**{issue_header}**"
+                            file_md = f"`{relevant_file}:{start_line}-{end_line}`"
+                            issue_str = f"{header_md} - {issue_content}\n\n{file_md}\n\n"
+                            if relevant_lines_str:
+                                issue_str += f"{relevant_lines_str}\n\n"
                         markdown_text += f"{issue_str}\n\n"
                     except Exception as e:
                         get_logger().exception(f"Failed to process 'Recommended focus areas for review': {e}")

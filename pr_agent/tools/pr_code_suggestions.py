@@ -789,10 +789,7 @@ class PRCodeSuggestions:
                     extension_to_language[ext] = language
 
             pr_body += "<table>"
-            header = f"Suggestion"
-            delta = 66
-            header += "&nbsp; " * delta
-            pr_body += f"""<thead><tr><td><strong>Category</strong></td><td align=left><strong>{header}</strong></td><td align=center><strong>Impact</strong></td></tr>"""
+            pr_body += """<thead><tr><td><strong>Category</strong></td><td align=left><strong>Suggestion</strong></td><td align=center><strong>Impact</strong></td></tr>"""
             pr_body += """<tbody>"""
             suggestions_labels = dict()
             # add all suggestions related to each label
@@ -834,7 +831,6 @@ class PRCodeSuggestions:
                     suggestion_content = suggestion['suggestion_content'].rstrip()
                     CHAR_LIMIT_PER_LINE = 84
                     suggestion_content = insert_br_after_x_chars(suggestion_content, CHAR_LIMIT_PER_LINE)
-                    # pr_body += f"<tr><td><details><summary>{suggestion_content}</summary>"
                     existing_code = suggestion['existing_code'].rstrip() + "\n"
                     improved_code = suggestion['improved_code'].rstrip() + "\n"
 
@@ -844,7 +840,8 @@ class PRCodeSuggestions:
                     patch = "\n".join(patch_orig.splitlines()[5:]).strip('\n')
 
                     example_code = ""
-                    example_code += f"```diff\n{patch.rstrip()}\n```\n"
+                    if patch:
+                        example_code = f"```diff\n{patch.rstrip()}\n```"
                     if i == 0:
                         pr_body += f"""<td>\n\n"""
                     else:
@@ -858,20 +855,16 @@ class PRCodeSuggestions:
                     if '`' in suggestion_summary:
                         suggestion_summary = replace_code_tags(suggestion_summary)
 
-                    pr_body += f"""\n\n<details><summary>{suggestion_summary}</summary>\n\n___\n\n"""
-                    pr_body += f"""
-**{suggestion_content}**
+                    if code_snippet_link:
+                        file_label = f"[{relevant_file} {range_str}]({code_snippet_link})"
+                    else:
+                        file_label = f"`{relevant_file} {range_str}`"
 
-[{relevant_file} {range_str}]({code_snippet_link})
-
-{example_code.rstrip()}
-"""
+                    pr_body += f"**{suggestion_summary}**<br>{suggestion_content}<br>{file_label}"
+                    if example_code:
+                        pr_body += f"<br><details><summary>Show patch</summary>\n\n{example_code}\n\n</details>"
                     if suggestion.get('score_why'):
-                        pr_body += f"<details><summary>Suggestion importance[1-10]: {suggestion['score']}</summary>\n\n"
-                        pr_body += f"__\n\nWhy: {suggestion['score_why']}\n\n"
-                        pr_body += f"</details>"
-
-                    pr_body += f"</details>"
+                        pr_body += f"<br><details><summary>Why this matters</summary>\n\n{suggestion['score_why']}\n\n</details>"
 
                     # # add another column for 'score'
                     score_int = int(suggestion.get('score', 0))

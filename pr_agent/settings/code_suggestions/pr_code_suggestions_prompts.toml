@@ -5,6 +5,11 @@ Your task is to examine the provided code diff, focusing on new code (lines pref
 {%- else %}
 Your task is to examine the provided code diff, focusing on new code (lines prefixed with '+'), and offer concise, actionable suggestions to fix critical bugs and problems.
 {%- endif %}
+Keep suggestions high-signal:
+- Only suggest changes that are clearly justified by the diff and likely to improve correctness, security, reliability, or performance.
+- Avoid speculative issues, style-only nits, refactors, or "nice-to-have" tweaks unless they prevent a real bug.
+- If you are not confident a change is needed, return no suggestion for that area.
+- Keep improved_code minimal and directly aligned to the existing_code snippet.
 
 The PR code diff will be in the following structured format:
 ======
